@@ -73,6 +73,8 @@ All three files in `.agent/rules/` are **always active**:
     │   └── SKILL.md                      ← Celery setup, task patterns, scheduling
     ├── django-testing-quality/
     │   └── SKILL.md                      ← pytest, factory_boy, coverage, CI quality
+    ├── django-edge-case-testing/
+    │   └── SKILL.md                      ← failure-first philosophy, adversarial questioning, scenario→test loop
     ├── django-production-deployment/
     │   └── SKILL.md                      ← Docker, Nginx, Gunicorn, CI/CD, monitoring
     ├── django-storages-s3/
@@ -269,6 +271,17 @@ Health check / internal view              → @extend_schema(exclude=True)
 Production schema access                  → SERVE_PERMISSIONS=["IsAuthenticated"]
 JWT auth in Swagger                       → SimpleJWTAuthenticationExtension in AppConfig.ready()
 Large project (30+ endpoints)             → cache_page on schema URL
+```
+
+### What edge cases should I test?
+```
+Any feature being designed or implemented   → django-edge-case-testing (always)
+Any service function with writes            → Phase 1: Simultaneity + Second-Request questions
+Any endpoint                                → Phase 1: Authorization Boundary question
+Any Celery task                             → Phase 1: Dependency Failure + Second-Request
+Any external API integration                → Phase 1: Dependency Failure question
+Any queryset on a growing table             → Phase 1: Scale question + N+1 check
+Test coverage feels complete                → Phase 3: break the defence, verify test fails
 ```
 
 ### What search technology?

@@ -9,6 +9,13 @@ description: >
 
 # Django Testing & Code Quality Skill
 
+> **Works with `django-edge-case-testing` skill.** This skill covers
+> test setup, structure, fixtures, mocking patterns, and tooling.
+> `django-edge-case-testing` covers what to test and how to think
+> about failure scenarios. Both apply on every feature.
+
+# Django Testing & Code Quality Skill
+
 > FIRST: For pytest-django docs, query Context7. For factory_boy docs, also query Context7.
 > Testing is not optional — it's how senior developers communicate correctness.
 

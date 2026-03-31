@@ -139,18 +139,72 @@ Rules for presenting options:
 - Do not present options for decisions that have a clear
   professional standard — just apply the standard.
 
-### Phase 6: SELF-INVALIDATION BEFORE COMMITTING
+### Phase 6: FAILURE SCENARIO INVENTORY (before writing code)
 
-After choosing a solution (either by clear winner or developer choice),
-run one invalidation pass:
+After choosing a solution, run this inventory before writing any
+implementation code. This is not a checklist — it is adversarial
+questioning applied to the specific feature. Each question must be
+answered concretely for this feature, not generically.
 
-Ask: "What would make this solution fail?"
-- If the answer surfaces a new constraint → address it in the design.
-- If it surfaces a new trade-off → present it before building.
-- If it produces no new constraints → proceed with confidence.
+**Ask about each of these failure axes:**
 
-Ask: "Is there a simpler solution that meets the same requirements?"
-- If yes → prefer the simpler solution unless complexity is justified.
+Simultaneity — what if two actors trigger this at the same time?
+Name the specific actors and the specific data corruption that results.
+If an answer exists, the implementation needs a defence and the tests
+need to prove it holds under concurrent execution.
+
+Second request — what if this exact operation is triggered twice?
+Name the specific duplicate outcome (double charge, double record,
+double notification). If an answer exists, the implementation needs
+idempotency and the tests need to verify the second call is a no-op.
+
+Dependency failure — what if each external dependency fails in turn?
+For each one (DB, cache, queue, external API, file storage), name the
+specific user-visible outcome when it is unavailable or returns bad data.
+If the answer is "a 500 error" or "a silent failure", the implementation
+is incomplete before it is written.
+
+Boundary — what is the exact threshold between valid and invalid for
+every input? Name the specific value at max, at max+1, at min, at zero.
+If any of these produce undefined behaviour, the implementation needs
+validation and the tests need to cover both sides of each boundary.
+
+Missing data — what if a record this feature depends on does not exist
+at the moment it is needed? Name the specific FK, cache key, or file
+that could be absent. If the answer is "an unhandled DoesNotExist",
+the implementation needs a guard and the tests need to prove it.
+
+Authorization — who must not be able to do this, and what stops them?
+Name the specific user, role, and object that must be blocked.
+If the answer relies on "the frontend won't let them", the
+implementation needs object-level permission checks.
+
+Scale — what breaks when the data volume is 10x today's? Name the
+specific query, the specific endpoint, or the specific task that
+produces N+1 queries, unbounded memory, or missing pagination.
+
+**Outcome of this phase:**
+Each question that produces a named failure scenario must be addressed
+in the implementation design and tracked for test coverage in Phase 7.
+Questions that produce "no issue" can be documented as such.
+No question can be skipped.
+
+### Phase 7: CONNECT FAILURES TO TESTS
+
+The failure scenarios from Phase 6 are not design notes — they are
+test obligations. Before considering implementation complete:
+
+State each failure scenario identified in Phase 6.
+For each one, either:
+- Name the test that will verify the defence holds, OR
+- Explain why this scenario cannot occur (with evidence from the code)
+
+If a failure scenario has no corresponding test and no architectural
+reason it cannot occur, the feature is incomplete. Tests written after
+the fact that are not rooted in a specific failure scenario are padding.
+
+Apply `django-edge-case-testing` skill for the full thinking process
+and test verification loop.
 
 ---
 
@@ -159,9 +213,9 @@ Ask: "Is there a simpler solution that meets the same requirements?"
 For any solution that consumes infrastructure resources, verify:
 
 Database:
-- Does this add N+1 queries? → Requires select_related/prefetch
-- Does this write to multiple tables? → Requires transaction.atomic()
-- Does this read a large table without filtering? → Requires pagination + index
+- Does this add N+1 queries? → Requires select_related/prefetch + assert_num_queries test
+- Does this write to multiple tables? → Requires transaction.atomic() + rollback test
+- Does this read a large table without filtering? → Requires pagination + index + scale test
 - Does this run in a loop? → Convert to bulk operation
 
 Memory:
