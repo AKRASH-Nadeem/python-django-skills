@@ -39,14 +39,38 @@ SKIP for (just build it well):
 
 ---
 
-## The Protocol — 6 Phases
+## The Protocol — 8 Phases
+
+### Phase 0: INTERROGATE THE REQUIREMENT
+
+> Defined fully in `senior-dev-mindset.md`. Summary:
+> Before reasoning about *how* to implement, ask whether *this* is the right solution
+> to the actual problem. Requirements are hypotheses, not specifications.
+
+Apply the Three Questions from `senior-dev-mindset.md`:
+1. What is the actual problem (stripped of the stated solution)?
+2. What assumption is embedded in this request?
+3. Is the implementation complexity proportional to the problem?
+
+Check the Requirement Smells table in `senior-dev-mindset.md`.
+If a smell matches, raise the concern with the CONCERN / ASSUMPTION / ALTERNATIVE / QUESTION format
+before proceeding to Phase 1.
+
+If no concern surfaces: proceed directly to Phase 1.
+
+---
 
 ### Phase 1: READ BEFORE ASSUMING
 
 Before reasoning about a solution:
-1. Read APP_STATE.md (what infrastructure already exists?)
-2. Read relevant existing code (what patterns are already in place?)
-3. Read requirements/settings (what constraints are already defined?)
+1. Read **DECISION_LOG.md** (what architectural decisions were made, why, and what would reverse them?)
+2. Read **APP_STATE.md** (what infrastructure already exists?)
+3. Read relevant existing code (what patterns are already in place?)
+4. Read requirements/settings (what constraints are already defined?)
+
+If a new request conflicts with a logged decision in DECISION_LOG.md:
+flag the conflict before forming any implementation approach.
+See `senior-dev-mindset.md` for the conflict flag format.
 
 Only form assumptions about things NOT found in these sources.
 If clarification is needed, ask maximum 2 questions per task.
@@ -56,7 +80,7 @@ For less-critical unknowns, state your assumption explicitly.
 ### Phase 2: CONSTRAINT INVENTORY
 
 List every real constraint that applies. For each constraint, state
-whether it is KNOWN (from code/config/APP_STATE.md) or ASSUMED.
+whether it is KNOWN (from code/config/APP_STATE.md/DECISION_LOG.md) or ASSUMED.
 
 Constraint categories to consider:
 - Infrastructure: What's actually available? (Redis? S3? Elasticsearch?)
@@ -206,6 +230,14 @@ the fact that are not rooted in a specific failure scenario are padding.
 Apply `django-edge-case-testing` skill for the full thinking process
 and test verification loop.
 
+### Phase 8: UPDATE DECISION_LOG.md
+
+If this task produced a new architectural decision (a library was chosen,
+a pattern was established, a constraint was surfaced), update DECISION_LOG.md.
+
+Replace changed entries — do not append.
+If no architectural decision was made, skip this phase.
+
 ---
 
 ## Resource Awareness Checklist
@@ -268,3 +300,9 @@ UNDER-OPTIMIZATION OF KNOWN BOTTLENECKS:
 ❌ Loading 10k records into memory when pagination is standard
 ✅ Apply optimizations where the constraint is already visible.
    Do not defer obvious performance work "for later."
+
+SILENT DECISION-MAKING:
+❌ Choosing a new architectural approach without recording why
+❌ Rejecting an approach without recording what was rejected
+✅ Every architectural fork goes into DECISION_LOG.md so the next
+   session starts with the reasoning, not just the outcome.
