@@ -9,33 +9,27 @@
 
 AI agents fail not from lack of knowledge but from *assumption accumulation*:
 each individual assumption seems reasonable, but stacked together they
-produce a solution that only works in an ideal scenario that doesn't exist.
+produce a solution that only works in an ideal scenario.
 
-Example failure chain:
-- Assumes infinite memory → picks an in-memory solution
-- Assumes single server → skips distributed locking
-- Assumes small dataset → skips pagination on a query
-- Assumes no concurrent writes → skips transaction safety
-
-This protocol forces the agent to surface constraints BEFORE
-choosing a solution, not after.
+This protocol forces constraint surfacing BEFORE choosing a solution.
 
 ---
 
-## When to Apply This Protocol
+## When to Apply
 
-ALWAYS apply for:
+**ALWAYS apply for:**
 - Any new architectural component (caching, queues, search, storage)
-- Any choice between two or more valid implementation approaches
-- Any solution that involves resource consumption (memory, DB connections,
-  background workers, external API calls)
-- Any feature that will scale with user growth
+- Any choice between two or more valid approaches
+- Any solution involving resource consumption (memory, DB connections, workers, external APIs)
+- Any feature that scales with user growth
 
-SKIP for (just build it well):
-- Standard CRUD endpoints with a clear serializer
-- Adding a new model field
-- Writing a test
-- Fixing a bug with a clear cause
+**SKIP only for:**
+- Standard CRUD endpoint following an *identical* existing pattern in the codebase
+- Adding a new model field with no behaviour change
+- Writing a test for existing logic
+- Fixing a bug with a clear, isolated, single-line cause
+
+**When in doubt: apply it.** The cost of applying unnecessarily is one extra minute. The cost of skipping is hours of wrong implementation.
 
 ---
 
@@ -43,9 +37,8 @@ SKIP for (just build it well):
 
 ### Phase 0: INTERROGATE THE REQUIREMENT
 
-> Defined fully in `senior-dev-mindset.md`. Summary:
-> Before reasoning about *how* to implement, ask whether *this* is the right solution
-> to the actual problem. Requirements are hypotheses, not specifications.
+> Defined in `senior-dev-mindset.md`. Summary:
+> Before reasoning about *how* to implement, ask whether *this* is the right solution.
 
 Apply the Three Questions from `senior-dev-mindset.md`:
 1. What is the actual problem (stripped of the stated solution)?
@@ -53,88 +46,69 @@ Apply the Three Questions from `senior-dev-mindset.md`:
 3. Is the implementation complexity proportional to the problem?
 
 Check the Requirement Smells table in `senior-dev-mindset.md`.
-If a smell matches, raise the concern with the CONCERN / ASSUMPTION / ALTERNATIVE / QUESTION format
-before proceeding to Phase 1.
-
-If no concern surfaces: proceed directly to Phase 1.
+If a smell matches, raise the concern before proceeding to Phase 1.
 
 ---
 
 ### Phase 1: READ BEFORE ASSUMING
 
 Before reasoning about a solution:
-1. Read **DECISION_LOG.md** (what architectural decisions were made, why, and what would reverse them?)
-2. Read **APP_STATE.md** (what infrastructure already exists?)
-3. Read relevant existing code (what patterns are already in place?)
-4. Read requirements/settings (what constraints are already defined?)
-
-If a new request conflicts with a logged decision in DECISION_LOG.md:
-flag the conflict before forming any implementation approach.
-See `senior-dev-mindset.md` for the conflict flag format.
+1. Read **DECISION_LOG.md** — what was decided and why; flag conflicts before proceeding
+2. Read **APP_STATE.md** — what infrastructure already exists
+3. Read relevant existing code — what patterns are already in place
+4. Read requirements/settings — what constraints are defined
 
 Only form assumptions about things NOT found in these sources.
-If clarification is needed, ask maximum 2 questions per task.
-Prioritise by impact: which unknown would most change the solution?
-For less-critical unknowns, state your assumption explicitly.
+Ask maximum 2 questions per task. Prioritise by impact.
+
+---
 
 ### Phase 2: CONSTRAINT INVENTORY
 
-List every real constraint that applies. For each constraint, state
-whether it is KNOWN (from code/config/APP_STATE.md/DECISION_LOG.md) or ASSUMED.
+List every real constraint. For each, state KNOWN (from code/config) or ASSUMED.
 
-Constraint categories to consider:
-- Infrastructure: What's actually available? (Redis? S3? Elasticsearch?)
+- Infrastructure: What's available? (Redis? S3? Elasticsearch?)
 - Scale: How many users/requests/records now? In 6 months?
 - Concurrency: Multiple workers? Multiple servers?
 - Data volume: Records per table? Growth rate?
 - Latency: User-facing or background? Acceptable response time?
-- Cost: Cloud resource cost sensitivity?
-- Team: Who maintains this? What's their familiarity level?
-- Reversibility: How hard is it to change this later?
+- Team: Who maintains this? What's their familiarity?
+- Reversibility: How hard is this to change later?
 
-For any ASSUMED constraint, state it explicitly.
-For any UNKNOWN constraint that materially changes the solution, ask.
+State ASSUMED constraints explicitly. Ask about UNKNOWN constraints that materially change the solution.
+
+---
 
 ### Phase 3: SOLUTION OPTIONS
 
-Identify the professional-level solutions that apply.
-For library-specific options, use Context7 or web search to confirm
-current recommendations — do not rely on training knowledge for
-fast-moving libraries or anything version-sensitive.
+Identify professional-level solutions. Use Context7 to confirm current recommendations — do not rely on training knowledge for version-sensitive libraries.
 
-For each option, answer:
+For each option:
 - What problem does it solve well?
 - What does it cost? (infrastructure, complexity, maintenance)
-- What does it fail at? (limits, known failure modes)
+- What does it fail at?
 - What scale is it appropriate for?
+
+---
 
 ### Phase 4: CLEAR WINNER TEST
 
 Is one option clearly better given the known constraints?
 
-If YES: Build it. State why it's the right choice in one sentence.
-Do not present options to the developer for decisions that have
-a clear professional answer — that wastes their time.
+**YES → Build it.** State why in one sentence. Do not present options for decisions with a clear professional answer.
 
-Additionally: if the team is small (1–3 developers), prefer solutions
-with lower operational complexity, even if a more powerful option
-exists. Maintenance cost over time outweighs theoretical power gains
-for small teams.
+**Small team rule**: For teams of 1–3, prefer solutions with lower operational complexity even if a more powerful option exists.
 
-If NO — genuine trade-off exists: Move to Phase 5.
+**NO → genuine trade-off exists** → Phase 5.
 
 A genuine trade-off exists when:
-- Two solutions have meaningfully different resource profiles
-  (e.g., Redis required vs DB-only)
+- Two solutions have meaningfully different resource profiles (e.g., Redis required vs DB-only)
 - Two solutions have meaningfully different maintenance complexity
-- The right choice depends on a growth assumption the developer
-  must confirm (e.g., "Will this table exceed 1M rows?")
-- The developer's priorities determine the answer
-  (e.g., fastest to ship vs most scalable)
+- The right choice depends on a growth assumption the developer must confirm
 
-### Phase 5: PRESENT OPTIONS (only on genuine trade-offs)
+---
 
-Format for presenting options to the developer:
+### Phase 5: PRESENT OPTIONS (genuine trade-offs only)
 
 ```
 DECISION NEEDED: [what the choice is about]
@@ -142,99 +116,57 @@ DECISION NEEDED: [what the choice is about]
 OPTION A — [short name]
   Best when: [scenario]
   Requires: [infrastructure or complexity cost]
-  Limitation: [what it fails at or scales poorly for]
+  Limitation: [what it fails at]
 
 OPTION B — [short name]
   Best when: [scenario]
   Requires: [infrastructure or complexity cost]
-  Limitation: [what it fails at or scales poorly for]
+  Limitation: [what it fails at]
 
-MY RECOMMENDATION: [Option A/B] because [one concrete reason
-based on what I know about your stack and constraints].
+MY RECOMMENDATION: [Option A/B] because [one concrete reason].
 
-Which would you like to proceed with?
+Which would you like?
 ```
 
-Rules for presenting options:
-- Maximum 2–3 options. More options = decision paralysis.
-- Always give a recommendation. "It depends" is not helpful.
-- The recommendation must be based on known constraints,
-  not a hedge. If truly unknown, state what would change it.
-- Do not present options for decisions that have a clear
-  professional standard — just apply the standard.
+Rules: max 2–3 options; always give a recommendation; base it on known constraints.
+
+---
 
 ### Phase 6: FAILURE SCENARIO INVENTORY (before writing code)
 
-After choosing a solution, run this inventory before writing any
-implementation code. This is not a checklist — it is adversarial
-questioning applied to the specific feature. Each question must be
-answered concretely for this feature, not generically.
+Adversarial questioning applied to this specific feature. Answer each concretely — not generically.
 
-**Ask about each of these failure axes:**
+**Simultaneity** — Two actors trigger this at the same time. What specific data corruption results? → Needs transaction/lock defence + concurrent test.
 
-Simultaneity — what if two actors trigger this at the same time?
-Name the specific actors and the specific data corruption that results.
-If an answer exists, the implementation needs a defence and the tests
-need to prove it holds under concurrent execution.
+**Second request** — Operation triggered twice before first completes. What specific duplicate outcome (double charge, double record)? → Needs idempotency + second-call no-op test.
 
-Second request — what if this exact operation is triggered twice?
-Name the specific duplicate outcome (double charge, double record,
-double notification). If an answer exists, the implementation needs
-idempotency and the tests need to verify the second call is a no-op.
+**Dependency failure** — Each external dependency fails in turn (DB, cache, queue, external API, storage). What is the specific user-visible outcome? → Any "500 error" or "silent failure" answer means the implementation is incomplete.
 
-Dependency failure — what if each external dependency fails in turn?
-For each one (DB, cache, queue, external API, file storage), name the
-specific user-visible outcome when it is unavailable or returns bad data.
-If the answer is "a 500 error" or "a silent failure", the implementation
-is incomplete before it is written.
+**Boundary** — Exact threshold between valid and invalid for every input. What happens at max, max+1, min, zero? → Any undefined behaviour needs validation + boundary tests.
 
-Boundary — what is the exact threshold between valid and invalid for
-every input? Name the specific value at max, at max+1, at min, at zero.
-If any of these produce undefined behaviour, the implementation needs
-validation and the tests need to cover both sides of each boundary.
+**Missing data** — A record this feature depends on doesn't exist at the moment needed. What specific FK, cache key, or file could be absent? → Needs guard + test.
 
-Missing data — what if a record this feature depends on does not exist
-at the moment it is needed? Name the specific FK, cache key, or file
-that could be absent. If the answer is "an unhandled DoesNotExist",
-the implementation needs a guard and the tests need to prove it.
+**Authorization** — Who must not do this, and what stops them? Name the specific user, role, and object to block. Frontend checks are UX — not security.
 
-Authorization — who must not be able to do this, and what stops them?
-Name the specific user, role, and object that must be blocked.
-If the answer relies on "the frontend won't let them", the
-implementation needs object-level permission checks.
+**Scale** — What breaks at 10× today's data? Name the specific query or task that produces N+1, unbounded memory, or missing pagination.
 
-Scale — what breaks when the data volume is 10x today's? Name the
-specific query, the specific endpoint, or the specific task that
-produces N+1 queries, unbounded memory, or missing pagination.
+Each question that surfaces a named failure scenario must be addressed in the implementation and tracked in Phase 7.
 
-**Outcome of this phase:**
-Each question that produces a named failure scenario must be addressed
-in the implementation design and tracked for test coverage in Phase 7.
-Questions that produce "no issue" can be documented as such.
-No question can be skipped.
+---
 
 ### Phase 7: CONNECT FAILURES TO TESTS
 
-The failure scenarios from Phase 6 are not design notes — they are
-test obligations. Before considering implementation complete:
-
-State each failure scenario identified in Phase 6.
-For each one, either:
+For each failure scenario from Phase 6, either:
 - Name the test that will verify the defence holds, OR
-- Explain why this scenario cannot occur (with evidence from the code)
+- Explain architecturally why this scenario cannot occur
 
-If a failure scenario has no corresponding test and no architectural
-reason it cannot occur, the feature is incomplete. Tests written after
-the fact that are not rooted in a specific failure scenario are padding.
+A feature with unaddressed failure scenarios is incomplete. Apply `django-edge-case-testing` skill for the full thinking loop.
 
-Apply `django-edge-case-testing` skill for the full thinking process
-and test verification loop.
+---
 
 ### Phase 8: UPDATE DECISION_LOG.md
 
-If this task produced a new architectural decision (a library was chosen,
-a pattern was established, a constraint was surfaced), update DECISION_LOG.md.
-
+If this task produced a new architectural decision, update `DECISION_LOG.md`.
 Replace changed entries — do not append.
 If no architectural decision was made, skip this phase.
 
@@ -242,67 +174,35 @@ If no architectural decision was made, skip this phase.
 
 ## Resource Awareness Checklist
 
-For any solution that consumes infrastructure resources, verify:
+**Database:**
+- N+1 queries? → `select_related`/`prefetch_related` + `assert_num_queries` test
+- Multiple table writes? → `transaction.atomic()` + rollback test
+- Large table without filtering? → pagination + index + scale test
+- Runs in a loop? → convert to bulk operation
 
-Database:
-- Does this add N+1 queries? → Requires select_related/prefetch + assert_num_queries test
-- Does this write to multiple tables? → Requires transaction.atomic() + rollback test
-- Does this read a large table without filtering? → Requires pagination + index + scale test
-- Does this run in a loop? → Convert to bulk operation
+**Memory:**
+- Queryset loaded into memory? → `.iterator()` for large sets
+- Per-request state? → must be cleared after request
+- Grows unbounded? → needs TTL or size limit
 
-Memory:
-- Does this load a queryset into memory? → Use .iterator() for large sets
-- Does this store per-request state? → Must be cleared after request
-- Does this grow unbounded? → Requires TTL or size limit
+**External services:**
+- Synchronous external API call in a view? → offload to Celery
+- External API in a loop? → batch the calls
+- Depends on a service that can go down? → needs fallback
 
-External services:
-- Does this call an external API synchronously? → Offload to Celery
-- Does this call an external API in a loop? → Batch the calls
-- Does this depend on a service that can go down? → Requires fallback
-
-Cache:
-- Does this cache a value that can become stale? → Define invalidation trigger
-- Does this cache per-user? → User ID must be part of the cache key
-- Does this generate many unique cache keys? → Check memory pressure
+**Cache:**
+- Value that can become stale? → define invalidation trigger
+- Per-user cache? → user ID in the cache key
+- Many unique cache keys? → check memory pressure
 
 ---
 
-## Anti-Patterns the Agent Must Avoid
+## Anti-Patterns to Avoid
 
-IDEAL WORLD REASONING:
 ❌ "This will work fine" (without checking concurrency)
 ❌ "We can add caching later" (when the query pattern is known now)
-❌ "This is fast enough" (without knowing the data volume)
-✅ State the scale assumption explicitly. If unknown, ask.
-
-ANALYSIS PARALYSIS:
-❌ Presenting 5 options for a problem with a clear answer
-❌ Asking the developer to choose between two things that are
-   both correct and the difference is minor
-✅ Apply professional judgment. Ask only on genuine forks.
-
-ASSUMPTION HIDING:
-❌ Building a Redis-dependent solution without noting Redis is required
-❌ Using a cloud-only service without noting it doesn't work locally
-✅ Any new infrastructure dependency gets flagged immediately and
-   added to APP_STATE.md.
-
-PREMATURE OPTIMIZATION:
+❌ Presenting 5 options for a problem with a clear professional answer
+❌ Building Redis-dependent solutions without flagging Redis as a new dependency
 ❌ Adding Elasticsearch for a 5k-record table
 ❌ Adding a message queue for a feature with 10 users
-✅ Match the solution to the current scale. Build with the
-   right architecture to grow into, but don't build infrastructure
-   the application hasn't earned yet.
-
-UNDER-OPTIMIZATION OF KNOWN BOTTLENECKS:
-❌ Using a synchronous HTTP call in a view when the endpoint is
-   already identified as high-traffic
-❌ Loading 10k records into memory when pagination is standard
-✅ Apply optimizations where the constraint is already visible.
-   Do not defer obvious performance work "for later."
-
-SILENT DECISION-MAKING:
-❌ Choosing a new architectural approach without recording why
-❌ Rejecting an approach without recording what was rejected
-✅ Every architectural fork goes into DECISION_LOG.md so the next
-   session starts with the reasoning, not just the outcome.
+❌ Choosing a new architectural approach without recording why in `DECISION_LOG.md`
