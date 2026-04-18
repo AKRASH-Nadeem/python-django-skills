@@ -217,7 +217,7 @@ After 10+ exchanges on a complex feature, proactively re-state:
 
 When a session exceeds **30 tool calls** OR when approaching a long pause, proactively write state to files:
 
-1. Ensure `DECISION_LOG.md` has an entry for every architectural decision made this session.
+1. Ensure Hindsight `retain` has been called for every architectural decision made this session (or `DECISION_LOG.md` has an entry if Hindsight is unavailable).
 2. Update `APP_STATE.md` if any structural change was made.
 3. Retain memories in Hindsight if connected.
 4. State: *"Context checkpoint written. Continuing."*

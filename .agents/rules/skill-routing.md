@@ -34,6 +34,7 @@ Multiple skills may apply — load all that match.
 | Social login, OAuth2, MFA, allauth | `django-allauth` |
 | Full-text search, facets, autocomplete, Elasticsearch | `django-elasticsearch` |
 | OpenAPI docs, @extend_schema, Swagger UI | `django-drf-spectacular` |
+| Hindsight memory, recall, retain, reflect, memory bank config, troubleshooting | `hindsight-docs` |
 
 > **Always-paired skills:**
 > - `django-edge-case-testing` loads alongside `django-testing-quality` whenever a feature is being implemented. You cannot write a feature without also loading the failure-scenario thinking skill.

@@ -217,10 +217,11 @@ A feature with unaddressed failure scenarios is incomplete. Apply `django-edge-c
 
 ---
 
-### Phase 8: UPDATE DECISION_LOG.md
+### Phase 8: RETAIN MEMORY / UPDATE RECORDS
 
-If this task produced a new architectural decision, update `DECISION_LOG.md`.
-Replace changed entries — do not append.
+If this task produced a new architectural decision, pattern, or constraint:
+1. **Retain** the memory via Hindsight MCP (`retain` tool) to update the project bank.
+2. If Hindsight is unavailable, update `DECISION_LOG.md` (replace changed entries — do not append).
 If no architectural decision was made, skip this phase.
 
 ---

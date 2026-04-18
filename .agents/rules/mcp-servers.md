@@ -75,6 +75,10 @@ If installed major ≠ skill baseline in `versions.lock.md` → MUST use version
 and project preferences. The backend agent and frontend agent SHARE THE SAME MEMORY BANK
 for a given project — enabling cross-agent context awareness.
 
+**When to load the `hindsight-docs` skill:** Load `hindsight-docs/SKILL.md`
+when troubleshooting Hindsight, configuring memory banks, or needing API reference beyond
+what this section covers. Start with `references/developer/api/main-methods.md`.
+
 ### Resolution protocol:
 ```
 1. Attempt Hindsight recall → if results found, use them.
@@ -138,6 +142,18 @@ recall  → at session start, before any architectural decision
 reflect → after completing a multi-feature implementation or sprint
 ```
 
+### Key parameters to use correctly:
+- **`document_id`**: Use for decisions that evolve. Same `document_id` = upsert (old
+  memories deleted, new ones extracted). E.g., `document_id: "auth-strategy-v2"`.
+- **`context`**: Short label shaping extraction quality. Use consistently:
+  `"architectural-decision"`, `"convention"`, `"api-contract"`, `"bug-resolution"`.
+- **`tags`**: Scope memories for filtering. Use `agent:backend`, `agent:frontend`,
+  `feature:<name>` to enable precise recall.
+- **`budget`**: `"low"` for quick lookups, `"mid"` for architecture queries,
+  `"high"` for comprehensive cross-project synthesis.
+- **`update_mode`**: Use `"append"` when adding to an evolving document (e.g., a
+  growing decision log). Use `"replace"` (default) when the whole decision changed.
+
 ### Query examples:
 ```bash
 # Session start — recall relevant context
@@ -145,12 +161,15 @@ hindsight recall [bank-id] "django project architecture decisions"
 hindsight recall [bank-id] "authentication strategy"
 hindsight recall [bank-id] "infrastructure available (Redis, S3, Elasticsearch)"
 
-# After a decision
-hindsight retain [bank-id] "Chose SimpleJWT over knox because team of 2 and no Chrome extension requirement. Knox per-token revocation not needed at this scale."
+# After a decision — retain with context and tags
+hindsight retain [bank-id] "Chose SimpleJWT over knox because team of 2 and no Chrome extension requirement. Knox per-token revocation not needed at this scale." --context "architectural-decision" --tags "agent:backend,feature:auth" --doc-id "auth-strategy"
 
 # Cross-agent context (backend learning from frontend decisions)
 hindsight recall [bank-id] "frontend API expectations and integration patterns"
 hindsight recall [bank-id] "what API endpoints has the frontend already integrated"
+
+# Filtered recall — only backend agent's decisions
+hindsight recall [bank-id] "caching strategy" --tags "agent:backend"
 ```
 
 ### Shared bank setup (frontend ↔ backend):
@@ -162,6 +181,26 @@ Frontend agent recalls what backend agent has stored (API contracts, error forma
 rate limiting behaviours).
 This eliminates the need to manually sync API contract documents between agents.
 ```
+
+### MCP tool names (exact — do not guess):
+```
+Core:     retain, recall, reflect
+Banks:    list_banks, create_bank, get_bank, update_bank, delete_bank, get_bank_stats
+Memory:   list_memories, get_memory, delete_memory, clear_memories
+Docs:     list_documents, get_document, delete_document
+Models:   create_mental_model, list_mental_models, get_mental_model,
+          update_mental_model, delete_mental_model, refresh_mental_model
+Rules:    list_directives, create_directive, delete_directive
+Ops:      list_operations, get_operation, cancel_operation
+Tags:     list_tags
+```
+
+**MCP endpoint format:** `http://localhost:8888/mcp/{bank_id}/`
+Single-bank mode (recommended): bank_id is in the URL, tools don't need it.
+Multi-bank mode: use `/mcp/` and pass `bank_id` as a parameter on each call.
+
+For full tool parameter schemas, load the `hindsight-docs` skill and read
+`references/developer/mcp-server.md`.
 
 ---
 
