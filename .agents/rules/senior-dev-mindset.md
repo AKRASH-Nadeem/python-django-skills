@@ -1,3 +1,7 @@
+---
+trigger: always_on
+---
+
 # Senior Developer Mindset — Memory & Requirement Interrogation
 
 > These rules are ALWAYS ACTIVE. They close the gap between an agent
@@ -174,6 +178,8 @@ When one appears, apply the Three Questions before proceeding.
 | "Make this configurable" | Unsure what the correct value is | "Is the uncertainty a design problem that configuration won't solve?" |
 | "Add a permission for this action" | Feature scope is ambiguous | "Should this action exist in this form, or is the model wrong?" |
 | "Paginate this list" | Assumed large dataset | "What is the actual record count? Is pagination warranted now?" |
+| "Move this to Celery" | Assumed latency problem | "Is the operation slow? Have we measured the request time?" |
+| "Add rate limiting" | Assumed abuse vector | "Is there evidence of abuse? Would auth solve this more cleanly?" |
 
 ### How to push back
 
@@ -212,14 +218,14 @@ QUESTION: Is the latency consistent across all requests (query-based) or only un
 ## Integration with the Existing Reasoning Protocol
 
 This rule adds Phase 0 to the reasoning protocol.
-The existing 7 phases are unchanged.
+The existing phases are unchanged.
 
 **Revised sequence for non-trivial tasks:**
 
 ```
 Phase 0 (this rule) — Interrogate the requirement
-Phase 1 (reasoning-protocol.md) — Read APP_STATE.md + DECISION_LOG.md + relevant code
-Phases 2–7 — Constraint inventory, options, winner test, failure scenarios, tests
+Phase 1 (reasoning-protocol.md) — Read APP_STATE.md + DECISION_LOG.md + LIBRARY_LEDGER.md + relevant code
+Phases 2–9 — Constraint inventory, options, winner test, failure scenarios, tests, self-healing
 ```
 
 Phase 0 happens before Phase 1 because interrogating the requirement

@@ -1,3 +1,7 @@
+---
+trigger: always_on
+---
+
 # Senior Django Developer Agent — Global Rules
 
 > These rules are ALWAYS active. Non-negotiable constraints governing every task,
@@ -14,9 +18,10 @@ Run this at the start of EVERY session, without exception.
 Check the project root. For each missing file, **CREATE IT NOW** — do not ask, do not wait.
 
 | File | If MISSING | If EXISTS |
-|------|-----------|-----------|
+|------|-----------|-----------| 
 | `APP_STATE.md` | Create using the template in `engineering-philosophy.md` Rule 4 | Read fully before any architectural work |
-| `DECISION_LOG.md` | Create: `# Decision Log\n_Created: [date]_` header | Read fully — flag any conflict with the current request |
+| `LIBRARY_LEDGER.md` | Create header from `library-ledger.md` LL1, backfill from `requirements/*.txt` or `pyproject.toml` | Read summary table |
+| `DECISION_LOG.md` | Create: `# Decision Log\n_Created: [date]_` | Read fully — flag any conflict with the current request |
 | `.env.example` | Create empty — populate as env vars are discovered | Read to understand current env var shape |
 
 ### Step 2 — Apply the reasoning protocol
@@ -38,7 +43,7 @@ Before considering any task complete, check this table:
 | What changed | Required update |
 |---|---|
 | New Django app added or removed | `APP_STATE.md` — Installed Apps section |
-| Package installed or removed | `APP_STATE.md` — Tech Stack section |
+| Package installed or removed | `APP_STATE.md` — Tech Stack + `LIBRARY_LEDGER.md` — new entry |
 | New env var added | `APP_STATE.md` — External Services section + `.env.example` |
 | New external service integrated | `APP_STATE.md` — External Services section |
 | Architectural decision made (library choice, pattern established, constraint surfaced) | `DECISION_LOG.md` — new entry |
@@ -200,6 +205,7 @@ Client waiting for response?
 - Prefer battle-tested packages. Every new dependency needs a justification comment.
 - Use `pip-tools` or `poetry` for pinning. Split requirements: `base.txt`, `development.txt`, `testing.txt`, `production.txt`.
 - Audit with `pip-audit` in CI.
+- Every new package → `LIBRARY_LEDGER.md` entry. See `library-ledger.md`.
 
 ---
 
@@ -209,3 +215,36 @@ These skills are version-agnostic. When writing code:
 1. Consult Context7 for the exact current API.
 2. Check the Django/DRF/Celery changelog for deprecations.
 3. Use the latest recommended pattern from the official docs.
+4. Compare installed major version against `versions.lock.md` baseline — see that file for the protocol.
+
+---
+
+## 📋 AGENTS.md — Machine-Readable Project Contract
+
+Create `AGENTS.md` on project init or first session on a project without one:
+
+```markdown
+# AGENTS.md — Machine-Readable Project Contract
+> Read before writing any code in this project.
+
+## Architecture: Feature-Based Django Apps
+[paste chosen folder structure]
+
+## Banned Patterns
+- No bare `except:` without logging
+- No `import *`
+- No business logic in views or serializers
+- No hardcoded secrets, URLs, or IDs
+- No `settings.DEBUG` in business logic
+- No raw SQL string interpolation
+
+## Stack (sync from APP_STATE.md)
+## Libraries (sync from LIBRARY_LEDGER.md summary table)
+## Decisions (sync from DECISION_LOG.md — one-line per entry)
+```
+
+Update AGENTS.md when:
+- A new banned pattern is established
+- Architecture style is confirmed or changed
+- A significant library is added (sync from LIBRARY_LEDGER.md)
+- A new architectural decision is logged (sync summary from DECISION_LOG.md)

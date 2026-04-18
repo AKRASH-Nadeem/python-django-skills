@@ -1,3 +1,7 @@
+---
+trigger: always_on
+---
+
 # Reasoning Protocol — Realistic, Factor-Aware Thinking
 
 > These rules are ALWAYS ACTIVE. They govern how the agent
@@ -22,6 +26,7 @@ This protocol forces constraint surfacing BEFORE choosing a solution.
 - Any choice between two or more valid approaches
 - Any solution involving resource consumption (memory, DB connections, workers, external APIs)
 - Any feature that scales with user growth
+- Any feature that introduces new business logic, permissions, or data writes
 
 **SKIP only for:**
 - Standard CRUD endpoint following an *identical* existing pattern in the codebase
@@ -33,7 +38,7 @@ This protocol forces constraint surfacing BEFORE choosing a solution.
 
 ---
 
-## The Protocol — 8 Phases
+## The Protocol — 9 Phases
 
 ### Phase 0: INTERROGATE THE REQUIREMENT
 
@@ -55,8 +60,9 @@ If a smell matches, raise the concern before proceeding to Phase 1.
 Before reasoning about a solution:
 1. Read **DECISION_LOG.md** — what was decided and why; flag conflicts before proceeding
 2. Read **APP_STATE.md** — what infrastructure already exists
-3. Read relevant existing code — what patterns are already in place
-4. Read requirements/settings — what constraints are defined
+3. Read **LIBRARY_LEDGER.md** — what is installed and what was rejected
+4. Read relevant existing code — what patterns are already in place
+5. Read requirements/settings — what constraints are defined
 
 Only form assumptions about things NOT found in these sources.
 Ask maximum 2 questions per task. Prioritise by impact.
@@ -67,13 +73,55 @@ Ask maximum 2 questions per task. Prioritise by impact.
 
 List every real constraint. For each, state KNOWN (from code/config) or ASSUMED.
 
-- Infrastructure: What's available? (Redis? S3? Elasticsearch?)
-- Scale: How many users/requests/records now? In 6 months?
+#### Infrastructure
+- What's available? (Redis? S3? Elasticsearch? Celery?)
+- Deployment target? (Docker? Heroku? bare VM?)
+
+#### Scale
+- How many users/requests/records now? In 6 months?
 - Concurrency: Multiple workers? Multiple servers?
 - Data volume: Records per table? Growth rate?
-- Latency: User-facing or background? Acceptable response time?
-- Team: Who maintains this? What's their familiarity?
+
+#### Latency
+- User-facing or background? Acceptable response time?
+- Is an async task acceptable for this feature?
+
+#### Team
+- Who maintains this? What's their familiarity?
 - Reversibility: How hard is this to change later?
+
+#### Security Lens *(new)*
+- What user roles can reach this endpoint? Is object-level permission enforced?
+- What input is trusted? Where is it validated (serializer, not view)?
+- Does this expose PII or sensitive data? Is the response filtered by role?
+- Is this endpoint rate-limited? Does it need HMAC/signature verification?
+- Does this touch auth, tokens, or sessions? What is the token invalidation path?
+
+#### AI Failure Mode Lens *(new)*
+- Is business logic embedded in a view? → Must be in `services.py`
+- Is validation inline in a view function? → Must be in serializer/form
+- Is a permission check only on the frontend/client? → Backend must enforce
+- Is an external API call synchronous in a request? → Must be offloaded to Celery
+- Is there a missing test for an implicit "happy path only" assumption?
+- Does this feature require context from previous sessions? → Ensure DECISION_LOG.md and APP_STATE.md cover it
+
+#### Context & Session Continuity Lens *(new)*
+- Does this feature span multiple sessions or produce architectural decisions?
+- If yes: is the decision being written to DECISION_LOG.md before this session ends?
+- Does this feature require Hindsight recall of past preferences or constraints?
+- Does Hindsight MCP have relevant prior context? → Recall before building (see `mcp-servers.md`)
+
+#### Observability & Analytics Lens *(new)*
+- Are errors tagged with context (user_id, request_id, app label) for Sentry/logging?
+- Are slow queries identified by django-silk or toolbar in dev?
+- Are Celery task failures surfaced (Flower, Sentry, or email alert)?
+- Is there a health check endpoint that exercises the critical path?
+
+#### Data Privacy & GDPR Lens *(new)*
+- No PII in `logging` calls, Sentry breadcrumbs, or Celery task args?
+- Is there a data deletion path when a user requests account removal?
+- Are personal fields encrypted at rest where required?
+- Does this feature store data that crosses a jurisdictional boundary?
 
 State ASSUMED constraints explicitly. Ask about UNKNOWN constraints that materially change the solution.
 
@@ -128,7 +176,10 @@ MY RECOMMENDATION: [Option A/B] because [one concrete reason].
 Which would you like?
 ```
 
-Rules: max 2–3 options; always give a recommendation; base it on known constraints.
+Rules:
+- Max 2–3 options; always give a recommendation; base it on known constraints.
+- **"It depends" is never an acceptable recommendation.** If you cannot decide, it means you are missing a constraint — ask for it. Do not present uncertainty as an answer.
+- If the developer has already stated their preference, skip Phase 5 entirely — no fork exists.
 
 ---
 
@@ -146,9 +197,11 @@ Adversarial questioning applied to this specific feature. Answer each concretely
 
 **Missing data** — A record this feature depends on doesn't exist at the moment needed. What specific FK, cache key, or file could be absent? → Needs guard + test.
 
-**Authorization** — Who must not do this, and what stops them? Name the specific user, role, and object to block. Frontend checks are UX — not security.
+**Authorization** — Who must not do this, and what stops them? Name the specific user, role, and object to block. Frontend checks are UX — not security. Backend enforces everything.
 
 **Scale** — What breaks at 10× today's data? Name the specific query or task that produces N+1, unbounded memory, or missing pagination.
+
+**Context loss** — If this feature spans multiple agent sessions, what decisions are not yet written to DECISION_LOG.md? What assumptions will the next session make incorrectly?
 
 Each question that surfaces a named failure scenario must be addressed in the implementation and tracked in Phase 7.
 
@@ -169,6 +222,27 @@ A feature with unaddressed failure scenarios is incomplete. Apply `django-edge-c
 If this task produced a new architectural decision, update `DECISION_LOG.md`.
 Replace changed entries — do not append.
 If no architectural decision was made, skip this phase.
+
+---
+
+### Phase 9: AGENTIC SELF-HEALING LOOP *(new)*
+
+When tests fail after implementation:
+
+```
+Iteration 1: Read the exact test error. Identify root cause. Fix the code.
+Iteration 2: If still failing — re-read the requirement. Am I solving the right problem?
+Iteration 3: If still failing — STOP. Do not patch further.
+```
+
+After 3 failed iterations:
+1. State: *"I've attempted 3 iterations on [test name] and it's still failing. The root cause appears to be [hypothesis]. This needs human review."*
+2. Output: the exact failing assertion, your hypothesis about the root cause, what you tried.
+3. Do not attempt a 4th iteration without user direction.
+
+**Test integrity rule:** If any iteration "fixes" the failure by changing the test assertion to match the current (wrong) output, that is **not a fix** — it is evidence the code under test is wrong. Changing a test assertion is only valid when the requirement itself has changed and the developer confirms the new expectation. Never weaken a test to make it pass.
+
+**Why:** Uncapped iteration loops produce patch-over-patch code that passes the test while violating the original design. 3 attempts is the professional signal that the problem is larger than the implementation.
 
 ---
 
@@ -206,3 +280,6 @@ If no architectural decision was made, skip this phase.
 ❌ Adding Elasticsearch for a 5k-record table
 ❌ Adding a message queue for a feature with 10 users
 ❌ Choosing a new architectural approach without recording why in `DECISION_LOG.md`
+❌ Business logic in views or serializers
+❌ Synchronous external API calls in request handlers
+❌ Looping indefinitely on a failing test (see Phase 9 self-healing ceiling)

@@ -123,7 +123,10 @@ DATABASES = {
 DATABASES["default"]["CONN_MAX_AGE"] = env.int("DB_CONN_MAX_AGE", default=60)
 DATABASES["default"]["OPTIONS"] = {"connect_timeout": 10}
 
-# Cache — Redis in production
+# Cache — Redis in production, locmem in dev
+# NOTE: REDIS_URL has a localhost default for dev convenience only.
+# In production settings, override with no default:
+#   CACHES["default"]["LOCATION"] = env("REDIS_URL")  # No default — crash if missing
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",

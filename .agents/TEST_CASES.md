@@ -161,18 +161,76 @@ Add explicit note: "This includes test/sandbox API keys. `default=''` or `defaul
 
 ---
 
-## Final Summary
+## Round 3 — Full 120-Test Stress Test (TB001–TB120)
+
+Date: 2026-04-18 | Models: Gemini 3 Flash, Gemini 3.1 Pro, Claude Sonnet 4.6, Claude Opus 4.6
+
+### Round 3 — Pre-fix results: 93 PASS, 22 PARTIAL, 5 FAIL
+
+| # | File | Gap Found | Fix Applied |
+|---|------|-----------|-------------|
+| TB004 | `skill-routing.md` | No skip clause for non-implementation questions | Added §0.2.1 skip clause |
+| TB006 | `mcp-servers.md` | "No results" vs "unavailable" not differentiated for Hindsight | Expanded resolution protocol to 5 steps |
+| TB018 | `skill-routing.md` | No auto-pairing of `django-security` with auth/realtime skills | Added security auto-pair rule |
+| TB024 | `skill-routing.md` | Same as TB018 — OAuth is auth-critical | Covered by TB018 fix |
+| TB030 | `skill-routing.md` | No "refactoring" entry in routing table | Added refactoring task guidance |
+| TB037 | `reasoning-protocol.md` | "It depends" not explicitly banned | Added explicit ban in Phase 5 rules |
+| TB055 | `project-context.md` | No verify-existing-entries check at task completion | Added DECISION_LOG consistency check to PC7 |
+| TB057 | `django-core-conventions` | REDIS_URL default contradicts Rule 1 | Added production override comment |
+| TB058 | `engineering-philosophy.md` | `default=""` for secrets not banned | Added explicit ban on empty-string defaults |
+| TB065 | `engineering-philosophy.md` | Grey zone between target 100 and mandatory 150 | Changed to proactive consolidation at 100 |
+| TB083 | `library-ledger.md` | Context7 query field could be left blank | Added "MUST NOT be blank" + env vars field |
+| TB087 | `versions.lock.md` | Minor-version breaking changes not caught | Added Step 2.1 breaking minor versions table |
+| TB088 | `versions.lock.md` | Package name changes not caught | Added Step 2.2 package name changes table |
+| TB089 | `install-protocol.md` | No env var tracking in install flow | Added Step 4.5 env var check |
+| TB090 | `install-protocol.md` | No CVE response protocol | Added severity-based CVE response table |
+| TB093 | `install-protocol.md` | pip-audit not marked non-negotiable | Changed Step 2.75 header to NON-NEGOTIABLE |
+| TB095 | `install-protocol.md` | No version-mismatch-after-install protocol | Added post-install version verification |
+| TB100 | `mcp-servers.md` | No Hindsight conflict resolution | Added conflict resolution section |
+| TB102 | `mcp-servers.md` | DECISION_LOG doesn't replicate cross-agent memory | Added SHARED_CONTRACTS.md fallback |
+| TB103 | `mcp-servers.md` | No push mechanism between agents | Covered by SHARED_CONTRACTS.md fallback |
+| TB104 | `mcp-servers.md` | Separate banks consequence not stated | Added explicit consequence statement |
+| TB105 | `mcp-servers.md` | No memory pruning protocol | Added memory hygiene section |
+| TB113 | `skill-routing.md` | No critical skills subset for Flash truncation | Added priority-ordered critical skills list |
+| TB115 | `reasoning-protocol.md` | Same as TB037 | Covered by TB037 fix |
+| TB116 | `project-context.md` | No "scaffold complete" gate | Added Gate 9 for new projects |
+| TB120 | `reasoning-protocol.md` | No "test integrity" rule | Added test integrity rule to Phase 9 |
+
+### Round 3 — Post-fix re-test: 120/120 PASS ✅
+
+---
+
+## Final Summary (all rounds)
 
 ```
-Total scenarios:      60
-Round 1 failures:      6  (T008, T019, T021, T029, T041, T051)
-Round 2 after fixes:  60/60 PASS
+Total scenarios:       120
+Round 1 failures:        6  (T008, T019, T021, T029, T041, T051)
+Round 2 after fixes:   60/60 PASS
+Round 3 new gaps:       27  (5 FAIL + 22 PARTIAL across TB001-TB120)
+Round 3 after fixes:  120/120 PASS
 
-Key improvements:
-  - Test/sandbox API keys explicitly excluded from "safe defaults"
-  - Run Instructions section populated on first APP_STATE.md creation
-  - .env.example kept in sync with new env vars
-  - APP_STATE.md size discipline (snapshot not log, max 100 lines)
-  - Clarifying questions capped at 2 per task
-  - Team size factored into solution complexity recommendation
+Files modified (Round 3):
+  - agents/rules/skill-routing.md        — 4 fixes (TB004, TB018/024, TB030, TB113)
+  - agents/rules/reasoning-protocol.md   — 2 fixes (TB037/115, TB120)
+  - agents/rules/install-protocol.md     — 4 fixes (TB089, TB090, TB093, TB095)
+  - agents/rules/engineering-philosophy.md — 2 fixes (TB058, TB065)
+  - agents/rules/mcp-servers.md          — 5 fixes (TB006, TB100, TB102-104, TB105)
+  - agents/rules/versions.lock.md        — 2 fixes (TB087, TB088)
+  - agents/rules/project-context.md      — 2 fixes (TB055, TB116)
+  - agents/rules/library-ledger.md       — 1 fix  (TB083)
+  - agents/skills/django-core-conventions/SKILL.md — 1 fix (TB057)
+
+Key improvements (Round 3):
+  - Skill routing now has skip clause, security auto-pairing, refactoring entry
+  - "It depends" explicitly banned; test integrity rule prevents assertion patching
+  - pip-audit is non-negotiable with CVE severity response table
+  - Install protocol tracks env vars and verifies versions post-install
+  - Empty-string defaults for secrets explicitly banned
+  - APP_STATE.md consolidation triggers proactively at 100 lines
+  - Hindsight protocol handles "no results", conflicts, and stale memories
+  - Cross-agent fallback to SHARED_CONTRACTS.md when Hindsight unavailable
+  - Minor-version breaking changes and package renames caught by versions.lock
+  - Gate 9 validates project scaffold completeness
+  - Context7 query field and env vars required field in ledger entries
 ```
+

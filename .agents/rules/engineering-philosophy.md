@@ -1,7 +1,61 @@
+---
+trigger: always_on
+---
+
 # Engineering Philosophy — Dynamic Solutions & App State
 
 > These rules are ALWAYS ACTIVE. They govern how the agent
 > builds solutions and maintains a living record of the application.
+
+---
+
+## Reasoning & Invalidation Log
+
+```
+DECISION 1: APP_STATE.md as mandatory living document
+  Initial: Developers maintain context manually
+  Invalidated: AI agents have no persistent memory between sessions.
+               Without a living snapshot, the agent repeats the same
+               infrastructure assumptions, adds Redis without noticing it's
+               already there, or misses that the dev env has no S3.
+  Solution: APP_STATE.md is non-negotiable — created on session start,
+            maintained on every structural change.
+
+DECISION 2: .env.example as a first-class artifact
+  Initial: Developers handle .env.example manually
+  Invalidated: Agent adds env vars without updating .env.example — the
+               next developer cloning the repo gets a silent startup crash.
+               Django's ImproperlyConfigured throws, but .env.example is
+               missing the entry, giving no hint what to set.
+  Solution: Every new env var requires a .env.example entry with a
+            comment explaining what it is and what format it expects.
+            This is explicitly mandated in Rule 1.
+
+DECISION 3: Size discipline on APP_STATE.md
+  Initial: APP_STATE.md grows indefinitely as features are added
+  Invalidated: A 500-line APP_STATE.md defeats the purpose — a new
+               developer can't quickly understand the system. It becomes
+               a log instead of a snapshot.
+  Solution: APP_STATE.md is a SNAPSHOT. Replace outdated entries, never
+            append. Target: under 100 lines. Above 150 = consolidate first.
+
+DECISION 4: No hardcoded defaults for ANY API key, including test/sandbox keys
+  Initial: sk_test_xxx looks safe as a default — it's just a test key
+  Invalidated: Test keys can accidentally reach production if someone
+               forgets to set the env var. They also get committed to
+               version control. The rule must be absolute: any key
+               string — test or live — has no hardcoded default.
+  Solution: Rule 1 explicitly covers this: 'This includes test/sandbox API
+            keys (e.g. sk_test_xxx). Use default=None with a startup check.'
+
+DECISION 5: Run Instructions must be populated on APP_STATE.md creation
+  Initial: Run Instructions section defined in schema but timing unclear
+  Invalidated: A new project creates APP_STATE.md but leaves Run Instructions
+               empty — a new developer joining the project can't run the app.
+  Solution: When APP_STATE.md is first created, the agent MUST immediately
+            populate Run Instructions with the current known setup steps.
+            Partial is acceptable; missing is not.
+```
 
 ---
 
@@ -26,7 +80,7 @@ Before writing any value into code, the agent asks:
 If YES → it belongs in an environment variable or settings layer.
 If NO  → it may be a constant in code (but still name it meaningfully).
 
-Every new env var must also be added to `.env.example` with a safe
+**Every new env var must also be added to `.env.example`** with a safe
 placeholder value and a comment describing what it is for. This is how
 the next developer knows what to configure when cloning the project.
 
@@ -46,9 +100,14 @@ Values that ALWAYS require configuration:
 Pattern: Use `django-environ` or `python-decouple`.
 Never use `os.environ.get("KEY", "hardcoded_fallback_for_prod")`.
 Sensitive values (secrets, keys) have NO default — missing = crash-fast.
-This includes test/sandbox API keys (e.g. sk_test_xxx). They can end up
-in production or version control. Use default=None with a startup check.
-Safe defaults only for non-sensitive operational values.
+**This includes test/sandbox API keys (e.g. `sk_test_xxx`). They can end up
+in production or version control. Use `default=None` with a startup check:
+`if not SECRET_KEY: raise ImproperlyConfigured("SECRET_KEY must be set")`**
+**`default=""` is also not acceptable for secrets.** An empty-string default
+bypasses crash-fast behaviour and lets the app start with a silently missing
+secret. Use no default at all (django-environ raises automatically) or
+`default=None` with an explicit `ImproperlyConfigured` check.
+Safe defaults only for non-sensitive operational values (e.g. timeouts, counts).
 
 ---
 
@@ -97,9 +156,11 @@ It is a snapshot of the application's current state — not a changelog.
 
 ### When to update APP_STATE.md:
 
-On first creation: agent populates Tech Stack, Environment Matrix
-(as far as known), and Run Instructions immediately. Partial is fine
-— mark unknown sections with `<!-- TODO -->`.
+**On first creation:** Agent MUST populate Tech Stack, Environment Matrix,
+Run Instructions (with current known steps), and External Services immediately.
+Partial is fine — mark unknown sections with `<!-- TODO -->`.
+**Run Instructions MUST be written, even if partial.** A new developer must
+be able to run the app from this document.
 
 Mandatory update triggers (agent MUST update after these):
 - New Django app added or removed
@@ -107,7 +168,7 @@ Mandatory update triggers (agent MUST update after these):
 - Authentication method changed or added
 - Database engine or major version changed
 - New external service integrated (Elasticsearch, S3, Stripe, etc.)
-- New environment variable added (agent adds it to the matrix)
+- New environment variable added (agent adds it to the matrix AND to `.env.example`)
 - Deployment method changed (Docker, Nginx config, workers changed)
 - A setting that differs between environments is added or changed
 
@@ -116,8 +177,13 @@ serializer changes, or anything that doesn't change how the app runs.
 
 ### Size discipline:
 APP_STATE.md is a SNAPSHOT, not a log. When updating, replace outdated
-entries — do not append. Target: under 100 lines. If it exceeds 150
-lines, consolidate before adding more.
+entries — do not append. **Target: under 100 lines. When an update would
+push the file past 100 lines, consolidate first.** If the file somehow
+reaches 150 lines, consolidation is mandatory before any further additions.
+
+Consolidation means: merge duplicate entries, shorten descriptions to one
+line, remove sections for features that were deleted, collapse verbose
+env-var lists into a `.env.example` reference.
 
 ### What APP_STATE.md contains:
 
@@ -166,6 +232,25 @@ architectural decisions._
 <!-- Minimal steps to get the app running locally -->
 ### Production
 <!-- Key differences from development -->
+```
+
+### .env.example discipline:
+
+Every env var added by the agent must appear in `.env.example`:
+
+```bash
+# Required — Django secret key (generate with: python -c "import secrets; print(secrets.token_urlsafe(50))")
+SECRET_KEY=your-secret-key-here
+
+# Required — Database URL
+DATABASE_URL=postgres://user:password@localhost:5432/dbname
+
+# Required — Stripe API key (production key from stripe.com dashboard)
+# NEVER use a hardcoded test key as default — test keys can reach production
+STRIPE_SECRET_KEY=sk_test_your_key_here
+
+# Optional — Redis URL (leave unset to use LocMem cache in dev)
+# REDIS_URL=redis://localhost:6379/0
 ```
 
 ### How the agent uses APP_STATE.md:
