@@ -32,11 +32,11 @@ This rule provides:
 
 ---
 
-## Part 1 — Hindsight MCP & DECISION_LOG.md: The Agent's Memory
+## Part 1 — Memvid MCP & DECISION_LOG.md: The Agent's Memory
 
 ### What it is
 
-Hindsight MCP (via `retain`/`recall` tools) is the primary memory system.
+Memvid MCP (via `memvid_put`/`memvid_find` tools) is the primary memory system.
 DECISION_LOG.md lives in the project root alongside APP_STATE.md as a fallback.
 These are not APP_STATE.md (which captures *what* the system is now), nor are
 they changelogs (which record *what changed* over time).
@@ -50,8 +50,8 @@ This is the memory that makes pushback intelligent rather than reflexive.
 ### When to write to memory
 
 On the first architectural decision in any project session.
-If Hindsight is connected, use the `retain` tool.
-If Hindsight is unavailable and DECISION_LOG.md doesn't exist, create it first.
+If Memvid is connected, use the `memvid_put` tool.
+If Memvid is unavailable and DECISION_LOG.md doesn't exist, create it first.
 
 ### What triggers an update
 

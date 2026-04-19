@@ -34,7 +34,7 @@ Multiple skills may apply — load all that match.
 | Social login, OAuth2, MFA, allauth | `django-allauth` |
 | Full-text search, facets, autocomplete, Elasticsearch | `django-elasticsearch` |
 | OpenAPI docs, @extend_schema, Swagger UI | `django-drf-spectacular` |
-| Hindsight memory, recall, retain, reflect, memory bank config, troubleshooting | `hindsight-docs` |
+| Memvid memory, memvid_find, memvid_put, memvid_ask, .mv2, shared memory, cross-agent, timeline, knowledge graph, troubleshooting | `memvid-docs` |
 
 > **Always-paired skills:**
 > - `django-edge-case-testing` loads alongside `django-testing-quality` whenever a feature is being implemented. You cannot write a feature without also loading the failure-scenario thinking skill.
@@ -61,20 +61,21 @@ Then proceed to Phase 0 of the reasoning protocol.
 
 ---
 
-## STEP 0.3 — Hindsight Recall (if Hindsight MCP is connected)
+## STEP 0.3 — Memvid Recall (if Memvid MCP is connected)
 
 Before Phase 0, attempt memory recall if relevant to the task:
 
 ```
-hindsight recall [bank-id] "relevant context query"
+memvid_find { "file": "shared.mv2", "query": "relevant context query", "mode": "hybrid", "limit": 5 }
+memvid_find { "file": "backend.mv2", "query": "relevant context query", "mode": "hybrid", "limit": 5 }
 Examples:
-  hindsight recall [bank-id] "authentication strategy"
-  hindsight recall [bank-id] "why did we choose [library]"
-  hindsight recall [bank-id] "project architecture decisions"
+  memvid_find { "file": "shared.mv2", "query": "authentication strategy", "mode": "hybrid", "limit": 5 }
+  memvid_find { "file": "shared.mv2", "query": "why did we choose [library]", "mode": "hybrid", "limit": 5 }
+  memvid_find { "file": "backend.mv2", "query": "project architecture decisions", "mode": "hybrid", "limit": 5 }
 ```
 
-If Hindsight is not connected: fall back to reading DECISION_LOG.md.
-See `mcp-servers.md` for the full Hindsight resolution protocol.
+If Memvid is not connected: fall back to reading DECISION_LOG.md.
+See `mcp-servers.md` for the full Memvid resolution protocol.
 
 ---
 

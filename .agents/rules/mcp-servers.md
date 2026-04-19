@@ -21,14 +21,14 @@ Step 1 — Source validation:
   pip-tools / pyproject → before ANY new library is proposed
 
 Step 2 — Memory:
-  Hindsight MCP        → recall at session start; retain after decisions; reflect after features
-  DECISION_LOG.md      → fallback if Hindsight MCP unavailable
+  Memvid MCP           → recall at session start via memvid_find; store after decisions via memvid_put
+  DECISION_LOG.md      → fallback if Memvid MCP unavailable
 
 Step 3 — Live docs:
   Fetch MCP            → live changelog, migration guides, niche docs Context7 doesn't cover
 
 Step 4 — Frontend-backend bridge (shared memory):
-  Hindsight MCP        → shared bank with frontend agent for cross-agent project context
+  Memvid MCP           → shared.mv2 with frontend agent for cross-agent project context
 ```
 
 ### When to use MCP vs skills vs training memory
@@ -38,7 +38,7 @@ Step 4 — Frontend-backend bridge (shared memory):
 | Django built-in APIs (ORM basics, views, URLs) | Training memory — for stable, well-known patterns |
 | External library method signatures | Context7 (always) |
 | Django 6-specific settings names | Context7 (always — settings change between majors) |
-| Past decisions about auth/cache/queue | Hindsight MCP → DECISION_LOG.md |
+| Past decisions about auth/cache/queue | Memvid MCP → DECISION_LOG.md |
 | Live changelogs / niche docs | Fetch MCP |
 | Architectural patterns | Skills |
 | Version-specific library code | Context7 with version-specific query |
@@ -69,138 +69,125 @@ If installed major ≠ skill baseline in `versions.lock.md` → MUST use version
 
 ---
 
-## 2. Hindsight MCP — Persistent Memory
+## 2. Memvid MCP — Persistent Memory
 
 **Purpose**: Persistent, cross-session memory for architectural decisions, team conventions,
-and project preferences. The backend agent and frontend agent SHARE THE SAME MEMORY BANK
-for a given project — enabling cross-agent context awareness.
+and project preferences. Uses portable `.mv2` files — no databases, no infrastructure.
+Backend and frontend agents share a `shared.mv2` file for cross-agent context awareness.
 
-**When to load the `hindsight-docs` skill:** Load `hindsight-docs/SKILL.md`
-when troubleshooting Hindsight, configuring memory banks, or needing API reference beyond
-what this section covers. Start with `references/developer/api/main-methods.md`.
+**When to load the `memvid-docs` skill:** Load `skills/memvid-docs/SKILL.md`
+when troubleshooting Memvid, configuring memory files, or needing the full
+40-tool reference beyond what this section covers.
 
 ### Resolution protocol:
 ```
-1. Attempt Hindsight recall → if results found, use them.
-2. Hindsight returns empty/no results → No relevant prior context
+1. Attempt memvid_find on shared.mv2 + backend.mv2 → if results found, use them.
+2. memvid_find returns empty/no results → No relevant prior context
    exists for this query. Proceed with DECISION_LOG.md + APP_STATE.md
    as primary context, then build fresh.
-3. Hindsight MCP is unavailable (connection error, not installed) →
+3. Memvid MCP is unavailable (connection error, not installed) →
    Fall back to DECISION_LOG.md + APP_STATE.md. If cross-agent memory
-   is needed and Hindsight is down, note in HANDOFF.md:
-   "Hindsight was unavailable — cross-agent decisions not synced."
-4. If neither DECISION_LOG.md nor APP_STATE.md exist →
-   Ask user: A) Setup Hindsight  B) Create DECISION_LOG.md  C) Start fresh
+   is needed and Memvid is down, note in HANDOFF.md:
+   "Memvid was unavailable — cross-agent decisions not synced."
+4. If neither DECISION_LOG.md nor any .mv2 files exist →
+   Ask user: A) Setup Memvid  B) Create DECISION_LOG.md  C) Start fresh
 5. Never skip the recall step. Even if you are confident in your
-   training data, recall may surface project-specific context.
+   training data, memvid_find may surface project-specific context.
+```
+
+### Core operations:
+```
+memvid_put   → after any architectural decision, convention, or contract established
+memvid_find  → at session start, before any architectural decision (hybrid search)
+memvid_ask   → for complex queries needing RAG synthesis across multiple memories
+```
+
+### Memory file topology:
+```
+backend.mv2   → Backend agent's PRIVATE memory (model conventions, Django patterns, service structure)
+frontend.mv2  → Frontend agent's PRIVATE memory (component patterns, UI decisions)
+shared.mv2    → SHARED cross-agent memory (API contracts, auth, error formats, integration points)
+```
+
+### Storing a memory (memvid_put):
+```
+memvid_put {
+  "file": "shared.mv2",
+  "input": "[agent:backend] [type:architectural-decision] [feature:auth]\nDecision: Chose django-knox for token authentication.\nWhy: Per-token revocation, Chrome extension compatibility, stateless.\nRejected: SimpleJWT (no per-token revocation), django-allauth (session-based).\nInvalidated by: Social OAuth required; server-rendered frontend adopted.",
+  "embed": true
+}
+```
+
+Always include:
+- `"embed": true` — enables semantic search via nomic embeddings
+- Tag prefix: `[agent:backend]` or `[agent:frontend]`
+- Type tag: `[type:architectural-decision]`, `[type:api-contract]`, `[type:convention]`
+
+### Recalling memories (memvid_find):
+```
+# Session start — recall relevant context
+memvid_find { "file": "shared.mv2", "query": "django project architecture decisions", "mode": "hybrid", "limit": 5 }
+memvid_find { "file": "shared.mv2", "query": "authentication strategy", "mode": "hybrid", "limit": 5 }
+memvid_find { "file": "backend.mv2", "query": "infrastructure available (Redis, S3)", "mode": "hybrid", "limit": 5 }
+
+# Cross-agent context (backend learning from frontend decisions)
+memvid_find { "file": "shared.mv2", "query": "frontend API expectations and integration patterns", "mode": "hybrid", "limit": 5 }
 ```
 
 ### Conflict resolution for shared memory:
 
-When recall returns contradictory memories (e.g., frontend stored
+When memvid_find returns contradictory memories (e.g., frontend stored
 "no rate limiting needed" but backend stored "rate limiting on all endpoints"):
 
 1. **Surface the conflict explicitly** to the user:
    ```
-   ⚠️ MEMORY CONFLICT: Hindsight contains two contradictory entries:
-   - [Agent A, Date]: "[statement 1]"
-   - [Agent B, Date]: "[statement 2]"
+   ⚠️ MEMORY CONFLICT: shared.mv2 contains two contradictory entries:
+   - [agent:frontend, Date]: "[statement 1]"
+   - [agent:backend, Date]: "[statement 2]"
    Which should I follow?
    ```
 2. **Do not silently pick one.** Contradictions in shared memory are
    architecture-level issues that need human resolution.
-3. After resolution, `retain` the resolved decision so both agents converge.
+3. After resolution, `memvid_put` the resolved decision and `memvid_delete`
+   the contradicting entry so both agents converge.
 
-### Cross-agent fallback (when Hindsight is unavailable):
+### Cross-agent fallback (when Memvid is unavailable):
 
-If Hindsight is unavailable and the task requires cross-agent knowledge:
+If Memvid is unavailable and the task requires cross-agent knowledge:
 1. Check for a `SHARED_CONTRACTS.md` file in the project root.
 2. If it doesn't exist, create it with the contract you're defining.
 3. Both agents must read `SHARED_CONTRACTS.md` at session start.
-4. This file is the manual fallback for Hindsight retain/recall.
-5. Explicitly state: "Hindsight unavailable. Writing to SHARED_CONTRACTS.md
+4. This file is the manual fallback for Memvid put/find.
+5. Explicitly state: "Memvid unavailable. Writing to SHARED_CONTRACTS.md
    so the other agent can pick this up."
 
-**Consequence of separate banks:** If each agent uses a different bank-id,
-all cross-agent memory is lost. Both agents MUST use the same bank-id for
-the same project. If separate banks are discovered, flag immediately.
-
 ### Memory hygiene:
-- **Reflect** after multi-feature implementations to consolidate memories
-  and remove intermediate/superseded decisions.
-- **Do not retain implementation details** (exact code lines, file paths).
-  Retain architectural decisions and contracts only.
+- Use `memvid_ask` after multi-feature implementations to synthesize and
+  consolidate memories. Remove superseded entries with `memvid_delete`.
+- **Do not store implementation details** (exact code lines, file paths).
+  Store architectural decisions and contracts only.
 - **Stale memory detection:** If a recalled decision references a library
   version, file, or pattern that no longer exists in the codebase, treat
   it as stale. Note the staleness and proceed with current codebase state.
-  After resolution, `retain` the updated decision to replace the stale one.
-
-### Operations:
-```
-retain  → after any architectural decision, bug resolution, or convention established
-recall  → at session start, before any architectural decision
-reflect → after completing a multi-feature implementation or sprint
-```
-
-### Key parameters to use correctly:
-- **`document_id`**: Use for decisions that evolve. Same `document_id` = upsert (old
-  memories deleted, new ones extracted). E.g., `document_id: "auth-strategy-v2"`.
-- **`context`**: Short label shaping extraction quality. Use consistently:
-  `"architectural-decision"`, `"convention"`, `"api-contract"`, `"bug-resolution"`.
-- **`tags`**: Scope memories for filtering. Use `agent:backend`, `agent:frontend`,
-  `feature:<name>` to enable precise recall.
-- **`budget`**: `"low"` for quick lookups, `"mid"` for architecture queries,
-  `"high"` for comprehensive cross-project synthesis.
-- **`update_mode`**: Use `"append"` when adding to an evolving document (e.g., a
-  growing decision log). Use `"replace"` (default) when the whole decision changed.
-
-### Query examples:
-```bash
-# Session start — recall relevant context
-hindsight recall [bank-id] "django project architecture decisions"
-hindsight recall [bank-id] "authentication strategy"
-hindsight recall [bank-id] "infrastructure available (Redis, S3, Elasticsearch)"
-
-# After a decision — retain with context and tags
-hindsight retain [bank-id] "Chose SimpleJWT over knox because team of 2 and no Chrome extension requirement. Knox per-token revocation not needed at this scale." --context "architectural-decision" --tags "agent:backend,feature:auth" --doc-id "auth-strategy"
-
-# Cross-agent context (backend learning from frontend decisions)
-hindsight recall [bank-id] "frontend API expectations and integration patterns"
-hindsight recall [bank-id] "what API endpoints has the frontend already integrated"
-
-# Filtered recall — only backend agent's decisions
-hindsight recall [bank-id] "caching strategy" --tags "agent:backend"
-```
-
-### Shared bank setup (frontend ↔ backend):
-```
-Both agents connect to the same bank-id for the same project.
-Backend agent recalls what frontend agent has stored (API shape expectations,
-which endpoints are integrated, auth token handling patterns).
-Frontend agent recalls what backend agent has stored (API contracts, error formats,
-rate limiting behaviours).
-This eliminates the need to manually sync API contract documents between agents.
-```
+  After resolution, `memvid_update` the stale entry to replace it.
+- Use `memvid_timeline` to review how decisions evolved over time.
 
 ### MCP tool names (exact — do not guess):
 ```
-Core:     retain, recall, reflect
-Banks:    list_banks, create_bank, get_bank, update_bank, delete_bank, get_bank_stats
-Memory:   list_memories, get_memory, delete_memory, clear_memories
-Docs:     list_documents, get_document, delete_document
-Models:   create_mental_model, list_mental_models, get_mental_model,
-          update_mental_model, delete_mental_model, refresh_mental_model
-Rules:    list_directives, create_directive, delete_directive
-Ops:      list_operations, get_operation, cancel_operation
-Tags:     list_tags
+Lifecycle: memvid_create, memvid_open, memvid_stats, memvid_verify, memvid_doctor
+Content:   memvid_put, memvid_put_many, memvid_view, memvid_update,
+           memvid_delete, memvid_correct, memvid_api_fetch
+Search:    memvid_find, memvid_vec_search, memvid_ask, memvid_timeline, memvid_when
+Graph:     memvid_enrich, memvid_memories, memvid_state, memvid_facts,
+           memvid_follow, memvid_who
+Session:   memvid_session, memvid_binding, memvid_status, memvid_sketch, memvid_nudge
+Analysis:  memvid_audit, memvid_debug_segment, memvid_export, memvid_tables,
+           memvid_schema, memvid_models
+Encrypt:   memvid_lock, memvid_unlock
+Utility:   memvid_process_queue, memvid_verify_single_file, memvid_config, memvid_version
 ```
 
-**MCP endpoint format:** `http://localhost:8888/mcp/{bank_id}/`
-Single-bank mode (recommended): bank_id is in the URL, tools don't need it.
-Multi-bank mode: use `/mcp/` and pass `bank_id` as a parameter on each call.
-
-For full tool parameter schemas, load the `hindsight-docs` skill and read
-`references/developer/mcp-server.md`.
+For full tool parameter schemas, load the `memvid-docs` skill.
 
 ---
 
@@ -260,7 +247,7 @@ If Context7 returns no results on the first call:
 | Server unavailable | Fallback |
 |---|---|
 | Context7 | Fetch MCP → raw docs URL → note limitation to user |
-| Hindsight | Read DECISION_LOG.md + APP_STATE.md |
+| Memvid | Read DECISION_LOG.md + APP_STATE.md; if cross-agent: SHARED_CONTRACTS.md |
 | Fetch | Note limitation, use training memory with explicit caveat |
 
 Never silently fall back to training memory when MCP was required.

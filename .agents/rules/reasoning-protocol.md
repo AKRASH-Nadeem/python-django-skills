@@ -108,8 +108,8 @@ List every real constraint. For each, state KNOWN (from code/config) or ASSUMED.
 #### Context & Session Continuity Lens *(new)*
 - Does this feature span multiple sessions or produce architectural decisions?
 - If yes: is the decision being written to DECISION_LOG.md before this session ends?
-- Does this feature require Hindsight recall of past preferences or constraints?
-- Does Hindsight MCP have relevant prior context? → Recall before building (see `mcp-servers.md`)
+- Does this feature require Memvid recall of past preferences or constraints?
+- Does Memvid MCP have relevant prior context? → `memvid_find` on shared.mv2 + backend.mv2 before building (see `mcp-servers.md`)
 
 #### Observability & Analytics Lens *(new)*
 - Are errors tagged with context (user_id, request_id, app label) for Sentry/logging?
@@ -220,8 +220,8 @@ A feature with unaddressed failure scenarios is incomplete. Apply `django-edge-c
 ### Phase 8: RETAIN MEMORY / UPDATE RECORDS
 
 If this task produced a new architectural decision, pattern, or constraint:
-1. **Retain** the memory via Hindsight MCP (`retain` tool) to update the project bank.
-2. If Hindsight is unavailable, update `DECISION_LOG.md` (replace changed entries — do not append).
+1. **Store** the memory via Memvid MCP (`memvid_put` tool) to the appropriate `.mv2` file.
+2. If Memvid is unavailable, update `DECISION_LOG.md` (replace changed entries — do not append).
 If no architectural decision was made, skip this phase.
 
 ---
