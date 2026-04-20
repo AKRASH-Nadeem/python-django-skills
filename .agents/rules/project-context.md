@@ -206,7 +206,7 @@ After 10+ exchanges on a complex feature, proactively re-state:
 | LIBRARY_LEDGER.md updated (if package added) | Check `library-ledger.md` |
 | DECISION_LOG.md updated (if architectural decision) | Check `senior-dev-mindset.md` |
 | DECISION_LOG.md consistency verified | Review existing entries — flag any that this task invalidated |
-| Memvid memory stored (if Memvid connected) | `memvid_put { "file": ".memvid/shared.mv2", "input": "/home/ak/.../DECISION_LOG.md" }` |
+| Memvid memory stored (if Memvid connected) | `memvid_put { "file": "shared.mv2", "input": "DECISION_LOG.md", "embed": true }` |
 | User has confirmed it works | Explicit sign-off |
 
 ---
@@ -217,7 +217,7 @@ After 10+ exchanges on a complex feature, proactively re-state:
 
 When a session exceeds **30 tool calls** OR when approaching a long pause, proactively write state to files:
 
-1. Ensure all architectural decisions are written to `DECISION_LOG.md`, then call Memvid `memvid_put` on it to ensure `.memvid/shared.mv2` is synced.
+1. Ensure all architectural decisions are written to `DECISION_LOG.md`, then call Memvid `memvid_put` on it to ensure `shared.mv2` is synced.
 2. Update `APP_STATE.md` if any structural change was made.
 3. Store memories in Memvid if connected.
 4. State: *"Context checkpoint written. Continuing."*
