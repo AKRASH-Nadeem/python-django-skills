@@ -61,21 +61,26 @@ Then proceed to Phase 0 of the reasoning protocol.
 
 ---
 
-## STEP 0.3 — Memvid Recall (if Memvid MCP is connected)
+## STEP 0.3 — Memvid Recall
 
-Before Phase 0, attempt memory recall if relevant to the task:
+> **NON-NEGOTIABLE. Gemini 3 Flash: do NOT skip this even under context pressure.**
+> Memory recall costs 2 tool calls. Missing project context costs hours.
+
+If Memvid MCP is connected, execute ALL of these before Phase 0:
 
 ```
-memvid_find { "file": "shared.mv2", "query": "relevant context query", "mode": "hybrid", "limit": 5 }
-memvid_find { "file": "backend.mv2", "query": "relevant context query", "mode": "hybrid", "limit": 5 }
-Examples:
-  memvid_find { "file": "shared.mv2", "query": "authentication strategy", "mode": "hybrid", "limit": 5 }
-  memvid_find { "file": "shared.mv2", "query": "why did we choose [library]", "mode": "hybrid", "limit": 5 }
-  memvid_find { "file": "backend.mv2", "query": "project architecture decisions", "mode": "hybrid", "limit": 5 }
+memvid_find { "file": "shared.mv2", "query": "[task-relevant keywords]", "mode": "hybrid", "limit": 5 }
+memvid_find { "file": "backend.mv2", "query": "[task-relevant keywords]", "mode": "hybrid", "limit": 5 }
 ```
 
-If Memvid is not connected: fall back to reading DECISION_LOG.md.
-See `mcp-servers.md` for the full Memvid resolution protocol.
+**Derive the query from the task.** Examples:
+- Building auth → `"query": "authentication strategy jwt session tokens"`
+- Adding a new API endpoint → `"query": "api contract endpoint naming conventions"`
+- Choosing a library → `"query": "library decision [library name] alternatives rejected"`
+- Any architectural task → `"query": "project architecture decisions constraints stack"`
+
+**If Memvid not connected:** fall back to reading DECISION_LOG.md.
+**Never skip this step on implementation tasks.** Even when "confident" — project-specific context may override training memory.
 
 ---
 
@@ -109,6 +114,35 @@ Only build something new after confirming it doesn't already exist.
 
 ---
 
+## STEP 0.6 — End-of-Task Memory Mandate
+
+> **Run after every implementation task that produced an architectural decision.**
+
+After any task that establishes a decision, contract, or convention:
+
+**1. Store to appropriate .mv2 file:**
+```
+memvid_put {
+  "file": "[backend.mv2 or shared.mv2]",
+  "input": "[agent:backend] [type:architectural-decision] [feature:X] [date:YYYY-MM-DD]\nDecision: ...\nWhy: ...\nRejected: ...\nInvalidated by: ...",
+  "embed": true
+}
+```
+
+**2. If the decision involves a new entity or service name, enrich the graph:**
+```
+memvid_enrich { "file": "backend.mv2", "all": false }
+```
+
+**3. Route by decision type:**
+| Decision type | File |
+|---|---|
+| Django patterns, ORM, Celery, services, tasks | `backend.mv2` |
+| API endpoint schema, auth flow, error format, WebSocket events | `shared.mv2` |
+| When in doubt | `shared.mv2` — prefer visibility to both agents |
+
+---
+
 ## Why this step exists
 
 Skills are not loaded automatically — **you** are the dispatcher. A task proceeding without the right skills will:
@@ -134,6 +168,7 @@ Skills are not loaded automatically — **you** are the dispatcher. A task proce
 **Gemini 3 Flash specific:**
 - Flash is optimized for speed. It will reach for the first plausible answer without completing Step 0. Force-complete Step 0 before any response begins.
 - Flash may truncate long instruction sets under context pressure. The skill registry (Step 0.1) is loaded first because it is in the most reliable part of context.
+- **Step 0.3 (Memvid recall) and Step 0.6 (end-of-task put) are mandatory for Flash.** Flash's speed bias will cause it to skip memory operations. Override this: memory recall and storage are non-negotiable.
 - **Critical skills that must survive truncation (in priority order):** `django-core-conventions`, `django-rest-api`, `django-architecture`, `django-security`, `django-edge-case-testing`. If context budget forces a choice, these five are non-negotiable for any feature implementation. Skills below the fold (elasticsearch, drf-spectacular, production-deployment) can be loaded on-demand when the task explicitly matches.
 - Flash will skip `django-edge-case-testing` under time pressure. This skill is non-negotiable on any feature implementation — execute it even if it feels redundant.
 - Flash may omit `transaction.atomic()` on multi-table writes. The `django-core-conventions` skill enforces this — load it.
@@ -145,9 +180,9 @@ Skills are not loaded automatically — **you** are the dispatcher. A task proce
 
 **Claude Sonnet 4.6 / Opus 4.6:**
 - These models handle the full skill context well. The same dispatcher applies.
-- Both may proactively suggest loading additional skills beyond the routing table — this is correct behaviour when the skill seems 50%+ relevant.
-- Opus should apply the reasoning protocol fully for architectural tasks — its context window handles it.
-- When multiple skills conflict on a detail: the skill loaded for the more specific task wins. Do not ask the user to resolve internal skill conflicts.
+- May proactively suggest additional skills — correct behaviour when skill is 50%+ relevant.
+- Opus: apply full reasoning protocol for architectural tasks.
+- Skill conflict: more specific task skill wins. Do not ask the user to resolve.
 
 **Multi-model compatibility:**
 - All instructions use imperative language ("do this", "never do that") — model-agnostic.
@@ -209,18 +244,18 @@ Faceted filtering                  → Elasticsearch aggregations
 
 ### Storage
 ```
-Public assets                      → PublicS3Storage (no signing, CDN)
-Private documents                  → PrivateS3Storage (signed URL, short TTL)
-Large uploads (video, datasets)    → Pre-signed POST (browser → S3 direct)
-Local dev / CI / tests             → InMemoryStorage
+Public assets      → PublicS3Storage (no signing, CDN)
+Private documents  → PrivateS3Storage (signed URL, short TTL)
+Large uploads      → Pre-signed POST (browser → S3 direct)
+Local/tests        → InMemoryStorage
 ```
 
 ### Authentication
 ```
-Email + password only              → allauth + custom user model
-Social login                       → django-allauth socialaccount
-MFA / TOTP / WebAuthn              → allauth.mfa
-SPA / mobile (headless)            → allauth.headless + JWT bridge
-Token API auth                     → SimpleJWT
-Service-to-service                 → API key (custom HasAPIKey)
+Email + password   → allauth + custom user model
+Social login       → django-allauth socialaccount
+MFA / TOTP         → allauth.mfa
+SPA / mobile       → allauth.headless + JWT bridge
+Token API auth     → SimpleJWT
+Service-to-service → API key (custom HasAPIKey)
 ```

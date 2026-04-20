@@ -24,6 +24,31 @@ Check the project root. For each missing file, **CREATE IT NOW** — do not ask,
 | `DECISION_LOG.md` | Create: `# Decision Log\n_Created: [date]_` | Read fully — flag any conflict with the current request |
 | `.env.example` | Create empty — populate as env vars are discovered | Read to understand current env var shape |
 
+---
+
+### Step 1.5 — Memvid Memory Bootstrap
+
+> **MANDATORY — execute before any task. Do not skip under time pressure.**
+> Gemini 3 Flash: this step is non-negotiable even when context is tight.
+
+**1. Init — verify or create .mv2 files:**
+- `memvid_stats { "file": "shared.mv2" }` → if error/missing: `memvid_create { "file": "shared.mv2" }`
+- `memvid_stats { "file": "backend.mv2" }` → if error/missing: `memvid_create { "file": "backend.mv2" }`
+
+**2. Start session tracking:**
+- `memvid_session { "file": "backend.mv2", "start": "be-[YYYYMMDD-HH]" }`
+
+**3. Recall project context (ALWAYS run both):**
+- `memvid_find { "file": "shared.mv2", "query": "project architecture api contracts auth stack", "mode": "hybrid", "limit": 5 }`
+- `memvid_find { "file": "backend.mv2", "query": "recent decisions constraints conventions patterns", "mode": "hybrid", "limit": 5 }`
+
+**4. First run (both return empty):** Migrate `DECISION_LOG.md` entries:
+- `memvid_put_many { "file": "backend.mv2", "input": "DECISION_LOG.md", "embed": true }`
+
+**If Memvid MCP unavailable:** Skip this step. Note "Memvid offline — using DECISION_LOG.md." and proceed.
+
+---
+
 ### Step 2 — Apply the reasoning protocol
 
 For ANY task beyond a standard CRUD operation that follows an established pattern, run through `reasoning-protocol.md` BEFORE writing code.
@@ -46,9 +71,11 @@ Before considering any task complete, check this table:
 | Package installed or removed | `APP_STATE.md` — Tech Stack + `LIBRARY_LEDGER.md` — new entry |
 | New env var added | `APP_STATE.md` — External Services section + `.env.example` |
 | New external service integrated | `APP_STATE.md` — External Services section |
-| Architectural decision made (library choice, pattern established, constraint surfaced) | `DECISION_LOG.md` — new entry |
-| Prior decision reversed | `DECISION_LOG.md` — REPLACE the entry, never append |
+| Architectural decision made (library choice, pattern established, constraint surfaced) | `DECISION_LOG.md` — new entry + `memvid_put` to `backend.mv2` or `shared.mv2` — format in `mcp-servers.md §2` |
+| API contract defined or changed with frontend | `memvid_put` to `shared.mv2` — tag `[type:api-contract]` — see `mcp-servers.md §2` |
+| Prior decision reversed | `DECISION_LOG.md` — REPLACE the entry + `memvid_update` the original frame (never append a contradiction) |
 | Auth, DB, cache, or storage method changed | `APP_STATE.md` — Tech Stack section |
+| Session ending | `memvid_session { "file": "backend.mv2", "stop": true }` |
 
 Nothing in this table applies → no update needed. Do not add noise to these files.
 

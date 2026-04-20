@@ -1,20 +1,23 @@
-# Memvid — Persistent Memory for AI Agents
+# Memvid — Persistent Memory for AI Agents (Backend)
 
-> **Load this skill** when the task involves: memory, remembering, recalling,
-> storing decisions, cross-agent context, architectural history, `.mv2` files,
-> knowledge graph, timeline, session recording, or any reference to Memvid.
+> **Load this skill** when: troubleshooting Memvid, configuring `.mv2` files,
+> working with knowledge graph tools, session replay, `.mv2e` encryption,
+> or any advanced Memvid operation beyond the daily `find/put/ask` workflow.
+>
+> **Day-to-day recall and storage** is covered in `mcp-servers.md §2` and
+> `rules.md Step 1.5`. Read those first.
 
 ---
 
 ## What is Memvid?
 
 Memvid is a **zero-infrastructure, single-file memory layer** for AI agents.
-It replaces complex RAG pipelines and server-based vector databases with a
-portable `.mv2` file that contains data, embeddings, search indices, and metadata.
+It replaces complex RAG pipelines with a portable `.mv2` file containing data,
+embeddings, search indices, and metadata — all in one file.
 
 **Architecture:**
 - **Smart Frames**: Immutable, append-only units with timestamps, checksums, metadata
-- **Single file**: Everything in one `.mv2` file — no `.wal`, `.lock`, `.shm` sidecars
+- **Single file**: Everything in one `.mv2` — no `.wal`, `.lock`, `.shm` sidecars
 - **Crash safe**: Embedded WAL ensures data integrity
 - **Portable**: Copy the file, carry the memory anywhere
 
@@ -26,255 +29,310 @@ portable `.mv2` file that contains data, embeddings, search indices, and metadat
 - AES-256-GCM encryption
 - Sub-5ms local memory access with predictive caching
 
----
-
-## MCP Server
-
-Memvid runs as an MCP server via [Tapiocapioca/memvid-mcp](https://github.com/Tapiocapioca/memvid-mcp),
-exposing **40 tools** to the agent. The server wraps the `memvid` Rust CLI.
-
-### Default Embedding Model
-
-**`nomic`** (nomic-embed-text-v1.5) — 768 dimensions, local, no API key, no rate limits.
-All embedding operations use `nomic` unless explicitly overridden.
+**MCP Server:** `Tapiocapioca/memvid-mcp` wraps the memvid Rust CLI, exposing 40 tools.
+**Default embedding model:** `nomic` (nomic-embed-text-v1.5) — 768 dimensions, local, no API key.
 
 ---
 
 ## Memory Topology — 3-File Architecture
 
 ```
-frontend.mv2   → Frontend agent's PRIVATE memory (component patterns, UI decisions, hooks, state management)
-backend.mv2    → Backend agent's PRIVATE memory (model conventions, service patterns, Django/API decisions)
-shared.mv2     → SHARED cross-agent memory (API contracts, auth strategy, error formats, integration points)
+backend.mv2   → Backend agent's PRIVATE memory
+frontend.mv2  → Frontend agent's PRIVATE memory
+shared.mv2    → SHARED cross-agent memory
 ```
-
-### When to write to which file
 
 | Memory type | File | Examples |
 |------------|------|----------|
-| Frontend-only decisions | `frontend.mv2` | "Chose Zustand over Redux", "Component folder structure", "Form validation approach" |
-| Backend-only decisions | `backend.mv2` | "Chose Knox over SimpleJWT", "Celery task pattern", "Migration strategy" |
-| Cross-agent contracts | `shared.mv2` | "API error envelope format", "Auth token flow", "Endpoint naming convention", "WebSocket event schema" |
+| Backend-only decisions | `backend.mv2` | Django patterns, Celery strategy, ORM conventions |
+| Frontend-only decisions | `frontend.mv2` | Component structure, state choice, CSS approach |
+| Cross-agent contracts | `shared.mv2` | API endpoint schema, auth token flow, error envelope, WebSocket events |
 
-### Rule: When in doubt, write to `shared.mv2`
-
-If a decision could affect the other agent, it belongs in shared memory.
-Better to have a frontend decision visible to the backend agent than to have
-the backend agent make an incompatible choice.
+**Rule: When in doubt → `shared.mv2`.** Both agents seeing a decision is better than one missing it.
 
 ---
 
-## Core Operations — Quick Reference
+## INITIALIZATION PROTOCOL (First Session)
 
-### 1. Store a Memory (`memvid_put`)
+Run once when `.mv2` files do not exist yet:
+
+```
+# Step 1: Create all three files
+memvid_create { "file": "shared.mv2" }
+memvid_create { "file": "backend.mv2" }
+memvid_create { "file": "frontend.mv2" }
+
+# Step 2: Verify creation
+memvid_stats { "file": "shared.mv2" }
+memvid_stats { "file": "backend.mv2" }
+
+# Step 3: Migrate existing decisions
+memvid_put_many { "file": "backend.mv2", "input": "DECISION_LOG.md", "embed": true }
+
+# Step 4: Seed shared memory with project context from APP_STATE.md
+memvid_put {
+  "file": "shared.mv2",
+  "input": "[agent:backend] [type:project-context] [date:YYYY-MM-DD]\n[Paste key sections: Tech Stack, External Services, Known Constraints from APP_STATE.md]",
+  "embed": true
+}
+
+# Step 5: Build knowledge graph
+memvid_enrich { "file": "backend.mv2", "all": true }
+memvid_enrich { "file": "shared.mv2", "all": true }
+
+# Step 6: Verify embeddings loaded
+memvid_stats { "file": "backend.mv2" }
+# Confirm: vector_count > 0. If 0 → re-run put with "embed": true
+```
+
+---
+
+## SESSION LIFECYCLE
+
+Every coding session follows this lifecycle:
+
+### Session Start
+```
+# Already covered in rules.md Step 1.5 — shown here for completeness
+memvid_stats { "file": "backend.mv2" }  # confirm file healthy
+memvid_session { "file": "backend.mv2", "start": "be-[YYYYMMDD-HH]" }
+memvid_find { "file": "shared.mv2", "query": "relevant project context", "mode": "hybrid", "limit": 5 }
+memvid_find { "file": "backend.mv2", "query": "recent decisions constraints", "mode": "hybrid", "limit": 5 }
+```
+
+### During Session — After Each Architectural Decision
+```
+memvid_put {
+  "file": "[backend.mv2 or shared.mv2]",
+  "input": "[agent:backend] [type:X] [feature:Y] [date:YYYY-MM-DD]\n...",
+  "embed": true
+}
+# Then optionally:
+memvid_enrich { "file": "backend.mv2", "all": false }  # extract new entities
+```
+
+### Session End — Consolidation
+```
+# Synthesize what was decided
+memvid_ask {
+  "file": "backend.mv2",
+  "question": "What architectural decisions were made in the most recent session?"
+}
+
+# Review session timeline
+memvid_timeline { "file": "backend.mv2" }
+
+# Stop session
+memvid_session { "file": "backend.mv2", "stop": true }
+```
+
+---
+
+## PROACTIVE STORAGE — WHEN TO WRITE
+
+**Write immediately (do not defer) when:**
+
+| Trigger | File | Tag |
+|---------|------|-----|
+| Library chosen over alternatives | `backend.mv2` or `shared.mv2` | `[type:architectural-decision]` |
+| API endpoint schema finalised | `shared.mv2` | `[type:api-contract]` |
+| Error response format established | `shared.mv2` | `[type:api-contract]` |
+| Auth token flow decided | `shared.mv2` | `[type:api-contract]` |
+| Django app structure confirmed | `backend.mv2` | `[type:convention]` |
+| Service/selector pattern established | `backend.mv2` | `[type:convention]` |
+| Developer constraint stated ("no Redis", "max N workers") | `backend.mv2` | `[type:constraint]` |
+| Integration point with frontend defined | `shared.mv2` | `[type:api-contract]` |
+| Decision reversed | Update existing frame with `memvid_update` | Do NOT append |
+
+**Do NOT store:**
+- Bug fixes following an already-stored pattern
+- New model fields following established conventions
+- Test additions or style changes
+- Anything that doesn't change how future decisions should be made
+
+---
+
+## MEMORY FORMAT — REQUIRED STRUCTURE
 
 ```
 memvid_put {
-  "file": "shared.mv2",
-  "input": "[agent:frontend] [type:architectural-decision] [feature:auth] [date:2025-11-01]\nDecision: Chose Zustand for client-side auth state.\nWhy: Lightweight, no boilerplate, works with React Compiler.\nRejected: Redux (overkill), Context (re-render issues at scale).\nInvalidated by: Need for server-side state sync or DevTools time-travel.",
+  "file": "shared.mv2 | backend.mv2",
+  "input": "[agent:backend] [type:TYPE] [feature:FEATURE] [date:YYYY-MM-DD]
+Decision: One sentence.
+Why: Core reasoning.
+Rejected: Alt 1 (reason). Alt 2 (reason).
+Invalidated by: The condition that would make this decision wrong.",
   "embed": true
 }
 ```
 
-**Always include:**
-- `"embed": true` — enables semantic search via nomic embeddings
-- Tag prefix: `[agent:frontend]` or `[agent:backend]`
-- Type tag: `[type:architectural-decision]`, `[type:api-contract]`, `[type:convention]`, `[type:bug-fix]`, `[type:constraint]`
+**Type values:**
+- `architectural-decision` — Library/framework choice, pattern establishment
+- `api-contract` — Endpoint schema, payload format, auth flow, error envelope
+- `convention` — Naming, file structure, coding pattern team has settled on
+- `constraint` — Hard limit from developer or infrastructure
+- `project-context` — Stack/infrastructure snapshot
 
-### 2. Recall a Memory (`memvid_find`)
+---
 
-```
-memvid_find {
-  "file": "shared.mv2",
-  "query": "authentication state management",
-  "mode": "hybrid",
-  "limit": 5
-}
-```
+## KNOWLEDGE GRAPH WORKFLOW
 
-**Search modes:**
-- `"hybrid"` — Lexical + semantic (recommended for most queries)
-- `"lex"` — Lexical only (exact keyword matches)
-- `"sem"` — Semantic only (meaning-based, uses embeddings)
-
-### 3. Ask a Question (`memvid_ask`)
+The knowledge graph extracts entities (services, libraries, patterns) and their relationships.
 
 ```
-memvid_ask {
-  "file": "shared.mv2",
-  "question": "What authentication strategy was chosen and why?"
-}
+# After storing multiple related memories:
+memvid_enrich { "file": "backend.mv2", "all": true }
+
+# Look up a specific entity
+memvid_who { "file": "backend.mv2", "query": "CeleryTaskQueue" }
+
+# Follow entity relationships (2 hops)
+memvid_follow { "file": "backend.mv2", "entity": "AuthService", "hops": 2 }
+
+# List all known facts
+memvid_facts { "file": "backend.mv2" }
+
+# Current memory state (entities + relationships summary)
+memvid_state { "file": "backend.mv2" }
 ```
 
-RAG-powered: retrieves relevant memories, synthesizes an answer. Use for
-complex questions that need reasoning across multiple stored memories.
+**When to use:** After seeding a project for the first time, or after a sprint where many new services/libraries were introduced. Run `memvid_enrich` to let the graph catch up.
 
-### 4. Check Memory Stats (`memvid_stats`)
+---
 
+## CROSS-AGENT COMMUNICATION VIA shared.mv2
+
+Both agents write to and read from `shared.mv2`. Since both run concurrently:
+
+**Write sequencing rule:** Each agent writes to its own private file first, then to `shared.mv2`. Never write to `shared.mv2` from two agents simultaneously for the same contract — coordinate via the developer if a conflict appears.
+
+**How backend discovers frontend decisions:**
 ```
-memvid_stats {
-  "file": "shared.mv2"
-}
+memvid_find { "file": "shared.mv2", "query": "frontend state management component conventions", "mode": "hybrid", "limit": 5 }
 ```
 
-Returns frame count, vector count, file size, and metadata.
+**How frontend discovers backend API:**
+```
+memvid_find { "file": "shared.mv2", "query": "backend api endpoint schema error format auth", "mode": "hybrid", "limit": 5 }
+```
+
+**Conflict protocol:**
+```
+⚠️ MEMORY CONFLICT: shared.mv2 has two contradictory entries:
+- [agent:frontend, Date]: "[statement 1]"
+- [agent:backend, Date]: "[statement 2]"
+Which should I follow?
+```
+After user resolves: `memvid_put` winner, `memvid_delete` loser. Never silently pick one.
+
+---
+
+## ADVANCED OPERATIONS
+
+### Audit report (with citations)
+```
+memvid_audit { "file": "backend.mv2", "query": "security decisions", "include_snippets": true }
+```
+
+### Temporal search (when was something decided?)
+```
+memvid_when { "file": "backend.mv2", "query": "when was Redis cache strategy decided?" }
+```
+
+### Timeline view (chronological)
+```
+memvid_timeline { "file": "backend.mv2" }
+```
+
+### Export for backup
+```
+memvid_export { "file": "backend.mv2", "output": "backend-backup.json", "format": "json" }
+```
+
+### Encryption (for sensitive memory)
+```
+memvid_lock { "file": "backend.mv2", "output": "backend.mv2e", "password": "your-password" }
+memvid_unlock { "file": "backend.mv2e", "output": "backend.mv2", "password": "your-password" }
+```
+
+### Bulk import (ingesting a document folder)
+```
+memvid_put_many { "file": "backend.mv2", "input": "./docs/architecture", "recursive": true, "embed": true }
+```
+
+### Fetch and store from URL (ingesting live docs)
+```
+memvid_api_fetch { "file": "backend.mv2", "url": "https://docs.djangoproject.com/en/6.0/topics/..." }
+```
+
+### Quick sketch (lightweight note without full embedding)
+```
+memvid_sketch { "file": "backend.mv2" }
+```
+
+---
+
+## MEMORY HYGIENE
+
+### Stale memory detection
+If a recalled decision references a library, file, or pattern that no longer exists:
+```
+# Update the stale frame (do NOT delete — preserve history)
+memvid_update { "file": "backend.mv2", "frame_id": [ID], "input": "SUPERSEDED: [original content]\nSuperseded by: [new decision] on [date]." }
+```
+
+### Pruning genuine conflicts
+When a decision is truly reversed and the old record is harmful (not just stale):
+```
+memvid_delete { "file": "backend.mv2", "frame_id": [ID] }
+# Then store the new decision with memvid_put
+```
+
+### Periodic consolidation (every few sprints)
+```
+memvid_ask { "file": "backend.mv2", "question": "Which decisions are still active? Which are stale?" }
+memvid_timeline { "file": "backend.mv2" }
+```
+
+---
+
+## TROUBLESHOOTING
+
+| Issue | Solution |
+|-------|---------|
+| `memvid_find` returns no results | `memvid_stats` — is `vector_count > 0`? If 0: re-put with `"embed": true` |
+| Slow search | Use `"mode": "lex"` for keyword-only (fastest); `"sem"` for semantic-only |
+| Memory file too large | `memvid_export` to backup, create fresh with curated memories |
+| Model not found | `memvid_models {}` — ensure nomic is installed |
+| MCP server won't start | Node.js 18+: `node --version`; memvid CLI: `memvid --version`; check `MEMVID_PATH` env var |
+| `memvid_put` text not stored | Use raw text directly in `"input"` field. For file: provide path. Ensure `"embed": true`. |
+| Session not recording | `memvid_status { "file": "backend.mv2" }` — check active session |
+| Cross-agent conflict | Surface to user with `⚠️ MEMORY CONFLICT:` format — never silently resolve |
 
 ---
 
 ## Full Tool Catalog (40 Tools)
 
-### Lifecycle (5 tools)
+### Lifecycle (5)
+`memvid_create` · `memvid_open` · `memvid_stats` · `memvid_verify` · `memvid_doctor`
 
-| Tool | Purpose | Example |
-|------|---------|---------|
-| `memvid_create` | Create a new `.mv2` file | `{ "file": "project.mv2" }` |
-| `memvid_open` | Open existing `.mv2` | `{ "file": "project.mv2" }` |
-| `memvid_stats` | File statistics | `{ "file": "project.mv2" }` |
-| `memvid_verify` | Verify file integrity | `{ "file": "project.mv2" }` |
-| `memvid_doctor` | Diagnose and repair | `{ "file": "project.mv2" }` |
+### Content (7)
+`memvid_put` · `memvid_put_many` · `memvid_view` · `memvid_update` · `memvid_delete` · `memvid_correct` · `memvid_api_fetch`
 
-### Content Management (7 tools)
+### Search (5)
+`memvid_find` · `memvid_vec_search` · `memvid_ask` · `memvid_timeline` · `memvid_when`
 
-| Tool | Purpose | Example |
-|------|---------|---------|
-| `memvid_put` | Store content with embeddings | `{ "file": "x.mv2", "input": "...", "embed": true }` |
-| `memvid_put_many` | Bulk store (batch) | `{ "file": "x.mv2", "input": "./docs", "recursive": true, "embed": true }` |
-| `memvid_view` | View a specific frame | `{ "file": "x.mv2", "frame_id": 42 }` |
-| `memvid_update` | Update frame content | `{ "file": "x.mv2", "frame_id": 42, "input": "new content" }` |
-| `memvid_delete` | Delete a frame | `{ "file": "x.mv2", "frame_id": 42 }` |
-| `memvid_correct` | Correct content errors | `{ "file": "x.mv2", "frame_id": 42, "correction": "fixed text" }` |
-| `memvid_api_fetch` | Fetch and store from URL | `{ "file": "x.mv2", "url": "https://..." }` |
+### Knowledge Graph (6)
+`memvid_enrich` · `memvid_memories` · `memvid_state` · `memvid_facts` · `memvid_follow` · `memvid_who`
 
-### Search (5 tools)
+### Session (5)
+`memvid_session` · `memvid_binding` · `memvid_status` · `memvid_sketch` · `memvid_nudge`
 
-| Tool | Purpose | Example |
-|------|---------|---------|
-| `memvid_find` | Hybrid search (lex + vec) | `{ "file": "x.mv2", "query": "...", "mode": "hybrid", "limit": 5 }` |
-| `memvid_vec_search` | Semantic-only search | `{ "file": "x.mv2", "query": "..." }` |
-| `memvid_ask` | RAG Q&A (retrieve + synthesize) | `{ "file": "x.mv2", "question": "..." }` |
-| `memvid_timeline` | Time-ordered memory view | `{ "file": "x.mv2" }` |
-| `memvid_when` | Temporal query | `{ "file": "x.mv2", "query": "when was auth decided?" }` |
+### Analysis (6)
+`memvid_audit` · `memvid_debug_segment` · `memvid_export` · `memvid_tables` · `memvid_schema` · `memvid_models`
 
-### Knowledge Graph (6 tools)
+### Encryption (2)
+`memvid_lock` · `memvid_unlock`
 
-| Tool | Purpose | Example |
-|------|---------|---------|
-| `memvid_enrich` | Extract entities (NER) | `{ "file": "x.mv2", "all": true }` |
-| `memvid_memories` | List stored memories | `{ "file": "x.mv2" }` |
-| `memvid_state` | Current knowledge state | `{ "file": "x.mv2" }` |
-| `memvid_facts` | Extract/list facts | `{ "file": "x.mv2" }` |
-| `memvid_follow` | Follow entity relationships | `{ "file": "x.mv2", "entity": "AuthService", "hops": 2 }` |
-| `memvid_who` | Entity lookup | `{ "file": "x.mv2", "query": "OAuth" }` |
-
-### Session Management (5 tools)
-
-| Tool | Purpose | Example |
-|------|---------|---------|
-| `memvid_session` | Start/stop/replay sessions | `{ "file": "x.mv2", "start": "session-name" }` |
-| `memvid_binding` | Bind context to session | `{ "file": "x.mv2" }` |
-| `memvid_status` | Current session status | `{ "file": "x.mv2" }` |
-| `memvid_sketch` | Quick memory sketch | `{ "file": "x.mv2" }` |
-| `memvid_nudge` | Nudge agent toward memory | `{ "file": "x.mv2" }` |
-
-### Analysis (6 tools)
-
-| Tool | Purpose | Example |
-|------|---------|---------|
-| `memvid_audit` | Audit report with sources | `{ "file": "x.mv2", "query": "security", "include_snippets": true }` |
-| `memvid_debug_segment` | Debug specific segments | `{ "file": "x.mv2" }` |
-| `memvid_export` | Export to JSON/backup | `{ "file": "x.mv2", "output": "backup.json", "format": "json" }` |
-| `memvid_tables` | View structured tables | `{ "file": "x.mv2" }` |
-| `memvid_schema` | View data schema | `{ "file": "x.mv2" }` |
-| `memvid_models` | List installed models | `{}` |
-
-### Encryption (2 tools)
-
-| Tool | Purpose | Example |
-|------|---------|---------|
-| `memvid_lock` | Encrypt `.mv2` → `.mv2e` | `{ "file": "x.mv2", "output": "x.mv2e", "password": "..." }` |
-| `memvid_unlock` | Decrypt `.mv2e` → `.mv2` | `{ "file": "x.mv2e", "output": "x.mv2", "password": "..." }` |
-
-### Utility (4 tools)
-
-| Tool | Purpose | Example |
-|------|---------|---------|
-| `memvid_process_queue` | Process queued operations | `{}` |
-| `memvid_verify_single_file` | Verify one file | `{ "file": "x.mv2" }` |
-| `memvid_config` | View/set configuration | `{}` |
-| `memvid_version` | CLI version info | `{}` |
-
----
-
-## Cross-Agent Memory Protocol
-
-### Writing to shared memory
-
-When storing a decision that affects both agents:
-
-1. **Tag with agent identity**: Always prefix with `[agent:frontend]` or `[agent:backend]`
-2. **Tag with type**: `[type:api-contract]`, `[type:architectural-decision]`, `[type:convention]`
-3. **Include invalidation conditions**: What would cause this to change?
-4. **Enable embeddings**: Always `"embed": true`
-
-### Reading shared memory
-
-Before making any architectural decision:
-
-1. **Search shared memory first**: `memvid_find` on `shared.mv2` for related context
-2. **Check for conflicts**: Does the new decision contradict existing shared memories?
-3. **If conflict found**: Flag it explicitly — do NOT silently override
-
-### Conflict Resolution
-
-```
-MEMVID CONFLICT: Memory in shared.mv2 says [existing decision].
-  Current request appears to contradict this.
-  The original decision was made because [constraint from memory].
-  Does [constraint] still apply?
-```
-
----
-
-## Memory Hygiene
-
-### When to store (DO store)
-- Architectural decisions (state management, routing, auth strategy)
-- API contracts between frontend and backend
-- Library selections and rejections with reasoning
-- Constraints from the developer ("no Redux", "bundle < 200KB")
-- Integration points (endpoint schemas, error formats, WebSocket events)
-
-### When NOT to store
-- Bug fixes following existing patterns
-- New components following established patterns
-- Style changes, copy changes
-- Test additions
-- Anything that doesn't change architectural reasoning
-
-### Pruning stale memories
-- When a decision is reversed: use `memvid_update` on the original frame, do NOT append a new contradicting memory
-- When a memory is obsolete: use `memvid_delete` to remove it
-- Periodically use `memvid_timeline` to review memory evolution
-
----
-
-## Fallback: When Memvid MCP is Unavailable
-
-If the Memvid MCP server is not connected or not responding:
-
-1. **Do NOT block the task** — proceed without memory
-2. **Fall back to `DECISION_LOG.md`** in the project root
-3. **Log the fallback**: Note that Memvid was unavailable and the decision was recorded in DECISION_LOG.md
-4. **On next session with Memvid available**: Migrate DECISION_LOG.md entries to the appropriate `.mv2` file
-
----
-
-## Troubleshooting
-
-| Issue | Solution |
-|-------|---------|
-| `memvid_find` returns no results | Check `memvid_stats` — is `vector_count > 0`? If not, re-put with `"embed": true` |
-| Slow search performance | Use `"mode": "lex"` for keyword-only search (fastest) |
-| Memory file too large | Use `memvid_export` to backup, then create a fresh file with curated memories |
-| Model not found | Run `memvid models list --model-type embedding` — ensure nomic is installed |
-| MCP server won't start | Check Node.js 18+: `node --version`; verify memvid CLI: `memvid --version` |
+### Utility (4)
+`memvid_process_queue` · `memvid_verify_single_file` · `memvid_config` · `memvid_version`
